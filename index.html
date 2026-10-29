@@ -201,7 +201,7 @@
 <div class="wrap">
   <header>
     <h1>Video Setup Check</h1>
-    <p class="lede">Check your framing, lighting and microphone before you record or join a call. Everything runs in your browser. Nothing is recorded or uploaded.</p>
+    <p class="lede">Check your framing, lighting and microphone before you record or join a call. Everything runs in your browser. Nothing is recorded or uploaded. The Help section explains exactly what happens to your video and audio.</p>
   </header>
 
   <main id="main" style="display:grid; gap:1rem;">
@@ -223,9 +223,6 @@
       </div>
       <fieldset class="opts">
         <legend>Options</legend>
-        <label><input type="checkbox" id="optAnnounce" checked> Announce changes as I adjust</label>
-        <label><input type="checkbox" id="optInterrupt"> Interrupt my screen reader with announcements (try this if you hear nothing with VoiceOver)</label>
-        <label><input type="checkbox" id="optSpeak"> Speak announcements with the browser voice (leave this off if you use a screen reader)</label>
         <label><input type="checkbox" id="optMirror" checked> Mirror the preview. This does not change what is recorded.</label>
         <label><input type="checkbox" id="optGuides" checked> Show framing guides on the preview</label>
       </fieldset>
@@ -237,11 +234,12 @@
         <p id="coach" class="coach">Press Start to begin.</p>
         <div class="stage-actions">
           <button type="button" id="describeBtn" class="btn secondary" disabled>Describe my setup</button>
+          <button type="button" id="pauseBtn" class="btn secondary">Pause voice feedback</button>
           <button type="button" id="testAnnounceBtn" class="btn secondary">Test announcement</button>
         </div>
         <div class="announce">
-          <h3 id="announce-h" class="announce-h">Announcements</h3>
-          <div id="announceLog" class="announce-log" role="log" aria-live="polite" aria-labelledby="announce-h"></div>
+          <h3 id="announce-h" class="announce-h">Recent announcements</h3>
+          <div id="announceLog" class="announce-log" role="group" aria-labelledby="announce-h"></div>
         </div>
         <div class="stage" id="stage">
           <div class="stage-inner mirror" id="stageInner" hidden>
@@ -282,6 +280,15 @@
     <section class="panel" aria-labelledby="help-h">
       <h2 id="help-h">Help</h2>
       <details>
+        <summary>What happens to my video and audio?</summary>
+        <p>Your video and audio are not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The microphone is used only to measure how loud you are. The sound itself is not kept.</p>
+        <p>Nothing is recorded or saved. Everything exists only in your browser's memory while the camera is on. Choosing Stop camera and microphone, closing the tab, or leaving the page turns the camera and microphone off and clears it all.</p>
+        <p>The only thing this page saves on your computer is your choices for the mirror and framing guide options. It saves no video, audio or results. The page sets no cookies, has no accounts and has no analytics.</p>
+        <p>Some things are downloaded to your browser. The first time the face detector runs, your browser downloads its program code from the jsDelivr code delivery service and its small face model file from Google's servers. These are downloads to your computer and do not include your video. As with any website, the servers that provide the page and those files can see ordinary visit details such as your internet address and browser type. The page itself is hosted on GitHub Pages.</p>
+        <p>Voice feedback uses the speech built into your browser. The words spoken are short advice messages made by this page, never your video or audio. Some browsers use online voices, and if yours does, the spoken words may be sent to the voice provider.</p>
+        <p>You can read the full source code of this page at <a href="https://github.com/GarthHum/video-setup-check">GarthHum/video-setup-check on GitHub</a>.</p>
+      </details>
+      <details>
         <summary>The browser did not ask for permission, or says access is blocked</summary>
         <p>Choose the camera or padlock icon in the browser address bar, allow the camera and microphone for this site, then press Start again.</p>
         <p><strong>Mac:</strong> open System Settings, then Privacy and Security, then Camera and Microphone, and turn on your browser.</p>
@@ -293,6 +300,11 @@
         <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
         <p>The voice test turns off echo cancellation, noise suppression and automatic gain, so the numbers reflect what your microphone really records. Levels are in decibels relative to full scale. Around minus 20 is a healthy speaking level, and zero is the point where the sound distorts.</p>
         <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
+      </details>
+      <details>
+        <summary>Voice feedback</summary>
+        <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop things you ask for, such as Describe my setup, Test announcement and the voice test instructions.</p>
+        <p>The voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your computer volume is up and choose Test announcement.</p>
       </details>
       <details>
         <summary>Supported browsers</summary>
@@ -332,21 +344,21 @@ const CFG = {
   minHeightPx: 720,
   mic: { veryQuiet: -45, quiet: -34, loud: -9, clipPeak: 0.98, clipFrames: 3, floor: -70 },
   noise: { quiet: -62, some: -50, minGap: 25 },
-  voice: { introMs: 5200, quietSec: 2, speakSec: 6 },
+  voice: { quietSec: 2, speakSec: 6 },
 };
 
 const $ = (id) => document.getElementById(id);
 const els = {
   start: $('startBtn'), describe: $('describeBtn'), error: $('errorBox'),
   camSel: $('camSel'), micSel: $('micSel'),
-  optAnnounce: $('optAnnounce'), optSpeak: $('optSpeak'), optMirror: $('optMirror'), optGuides: $('optGuides'),
+  optMirror: $('optMirror'), optGuides: $('optGuides'),
   coach: $('coach'), stage: $('stage'), stageInner: $('stageInner'), video: $('video'), overlay: $('overlay'), placeholder: $('placeholder'),
   pictureList: $('pictureList'), soundList: $('soundList'),
   meter: $('meter'), meterCover: $('meterCover'), meterValue: $('meterValue'),
   zoneLow: $('zoneLow'), zoneGood: $('zoneGood'), zoneHot: $('zoneHot'),
   voiceBtn: $('voiceBtn'), voiceStatus: $('voiceStatus'),
   reportPanel: $('reportPanel'), report: $('report'),
-  log: $('announceLog'), testAnnounce: $('testAnnounceBtn'), optInterrupt: $('optInterrupt'),
+  log: $('announceLog'), testAnnounce: $('testAnnounceBtn'), pause: $('pauseBtn'),
 };
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -366,20 +378,15 @@ function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY) ||
 function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
-      announce: els.optAnnounce.checked, speak: els.optSpeak.checked, interrupt: els.optInterrupt.checked,
       mirror: els.optMirror.checked, guides: els.optGuides.checked,
     }));
   } catch (e) { /* storage unavailable, ignore */ }
 }
 (function applyPrefs() {
   const p = loadPrefs();
-  if (p.announce === false) els.optAnnounce.checked = false;
-  if (p.speak === true) els.optSpeak.checked = true;
   if (p.mirror === false) els.optMirror.checked = false;
   if (p.guides === false) els.optGuides.checked = false;
-  if (p.interrupt === true) els.optInterrupt.checked = true;
   els.stageInner.classList.toggle('mirror', els.optMirror.checked);
-  applyLiveMode();
 })();
 
 /* ---------- State ---------- */
@@ -392,35 +399,58 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null,
   announce: { cand: null, count: 0, spoken: null, at: 0 },
+  paused: false, utter: null,
 };
 
 /* ---------- Announcements ---------- */
-/* Messages are added as new paragraphs to a visible log (role="log"). Adding a new element is the
-   live-region pattern screen readers handle most reliably. The short delay lets VoiceOver finish
-   speaking a button or focus change before the message arrives. */
+/* Advice is spoken with the browser's own voice (speechSynthesis) and also written to a plain
+   history list. If the browser has no speech at all, the list becomes a live region instead. */
+const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
 const LOG_MAX = 5;
-const LOG_DELAY_MS = 450;
-function applyLiveMode() {
-  els.log.setAttribute('aria-live', els.optInterrupt.checked ? 'assertive' : 'polite');
+let speechUnlocked = false;
+if (!synth) els.log.setAttribute('aria-live', 'polite');
+
+/* Safari only allows speech after a click or key press, so every button that can lead to
+   speech calls this first, inside its own click handler. */
+function unlockSpeech() {
+  if (!synth || speechUnlocked) return;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    synth.speak(u);
+    speechUnlocked = true;
+  } catch (e) { /* ignore */ }
 }
 function toLog(text) {
-  setTimeout(() => {
-    const p = document.createElement('p');
-    p.textContent = text;
-    els.log.appendChild(p);
-    while (els.log.children.length > LOG_MAX) els.log.removeChild(els.log.firstElementChild);
-  }, LOG_DELAY_MS);
+  const p = document.createElement('p');
+  p.textContent = text;
+  els.log.appendChild(p);
+  while (els.log.children.length > LOG_MAX) els.log.removeChild(els.log.firstElementChild);
 }
-function say(text) {
-  if (!text) return;
-  if (els.optSpeak.checked && 'speechSynthesis' in window) {
+function speak(text, interrupt) {
+  return new Promise((resolve) => {
+    if (!synth) { resolve(); return; }
+    let finished = false;
+    const finish = () => { if (!finished) { finished = true; resolve(); } };
     try {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-      return;
-    } catch (e) { /* fall through to the log */ }
-  }
+      const u = new SpeechSynthesisUtterance(text);
+      S.utter = u; // keeps the utterance alive until it ends, because Chrome can drop it otherwise
+      u.onend = finish;
+      u.onerror = finish;
+      if (interrupt) synth.cancel();
+      // A short gap after cancel() stops Safari from dropping the next utterance.
+      setTimeout(() => { try { synth.speak(u); } catch (e) { finish(); } }, interrupt ? 90 : 0);
+      setTimeout(finish, 4000 + text.length * 90);
+    } catch (e) { finish(); }
+  });
+}
+/* opts.auto: automatic advice, silenced while paused. opts.queue: wait for current speech to end. */
+function say(text, opts) {
+  if (!text) return Promise.resolve();
+  const o = opts || {};
+  if (o.auto && S.paused) return Promise.resolve();
   toLog(text);
+  return speak(text, !o.queue);
 }
 
 /* ---------- Rows ---------- */
@@ -706,7 +736,8 @@ function loadDetector() {
     if (S.stream) {
       say(S.detector
         ? 'Face detector ready. Move into view and I will tell you how to adjust.'
-        : 'The face detector could not load, so framing advice is unavailable. Lighting and sound checks still work.');
+        : 'The face detector could not load, so framing advice is unavailable. Lighting and sound checks still work.',
+      { auto: true, queue: true });
     }
     evaluateAndRender();
   })();
@@ -928,9 +959,9 @@ async function runVoiceTest() {
   S.voice = null;
   renderSound();
   try {
-    say('Voice test. First stay silent for ' + T.quietSec + ' seconds. After the beep, speak normally for ' + T.speakSec + ' seconds. A lower beep marks the end.');
     els.voiceStatus.textContent = 'Get ready…';
-    await sleep(T.introMs);
+    await say('Voice test. First stay silent for ' + T.quietSec + ' seconds. After the beep, speak normally for ' + T.speakSec + ' seconds. A lower beep marks the end.');
+    await sleep(500);
     if (!S.analyser) return;
     S.testBuf = [];
     await countdown(T.quietSec, 'Stay silent');
@@ -1136,7 +1167,7 @@ function evaluateAndRender() {
 }
 
 function maybeAnnounce(top, f) {
-  if (!els.optAnnounce.checked || S.testing) return;
+  if (S.paused || S.testing) return;
   const A = S.announce;
   const now = Date.now();
   let key;
@@ -1147,9 +1178,9 @@ function maybeAnnounce(top, f) {
   if (A.count < 2) return;
   const text = top ? top.text : 'Everything looks good. Hold this position.';
   if (key !== A.spoken && now - A.at >= 3000) {
-    say(text); A.spoken = key; A.at = now;
+    say(text, { auto: true }); A.spoken = key; A.at = now;
   } else if (key === A.spoken && key !== 'ok' && now - A.at >= 12000) {
-    say(text); A.at = now;
+    say(text, { auto: true }); A.at = now;
   }
 }
 
@@ -1192,23 +1223,27 @@ function describeSetup() {
 }
 
 /* ---------- Wiring ---------- */
-els.start.addEventListener('click', () => { if (S.stream) stop(); else start(); });
-els.describe.addEventListener('click', describeSetup);
+els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
+els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
 els.testAnnounce.addEventListener('click', () => {
-  say('This is a test announcement. If you can hear this, automatic announcements are working. If you heard nothing, turn on the option to interrupt your screen reader, in Options.');
+  unlockSpeech();
+  say('This is a test announcement. If you can hear this, voice feedback is working.');
 });
-els.optInterrupt.addEventListener('change', () => { applyLiveMode(); savePrefs(); });
-els.voiceBtn.addEventListener('click', runVoiceTest);
+els.pause.addEventListener('click', () => {
+  unlockSpeech();
+  S.paused = !S.paused;
+  els.pause.textContent = S.paused ? 'Resume voice feedback' : 'Pause voice feedback';
+  say(S.paused ? 'Voice feedback paused. Choose the button again to resume.' : 'Voice feedback resumed.');
+});
+els.voiceBtn.addEventListener('click', () => { unlockSpeech(); runVoiceTest(); });
 els.camSel.addEventListener('change', () => { if (S.stream) start(); });
 els.micSel.addEventListener('change', () => { if (S.stream) start(); });
 els.optMirror.addEventListener('change', () => { els.stageInner.classList.toggle('mirror', els.optMirror.checked); savePrefs(); });
 els.optGuides.addEventListener('change', () => { drawOverlay(); savePrefs(); });
-els.optAnnounce.addEventListener('change', savePrefs);
-els.optSpeak.addEventListener('change', () => {
-  savePrefs();
-  if (!els.optSpeak.checked && 'speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
+window.addEventListener('pagehide', () => {
+  stopStream();
+  if (synth) { try { synth.cancel(); } catch (e) { /* ignore */ } }
 });
-window.addEventListener('pagehide', stopStream);
 
 renderPicture();
 renderSound();
