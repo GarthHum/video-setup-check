@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Setup Check</title>
+<style>
+  /* Layout: controls on top, preview beside the picture checks, sound checks below, summary and help last. */
+  :root {
+    --bg: #edf1f1;
+    --surface: #ffffff;
+    --ink: #12201f;
+    --muted: #455654;
+    --line: #c6d3d1;
+    --accent: #0a6a6e;
+    --on-accent: #ffffff;
+    --focus: #0a6a6e;
+    --good: #176b41;
+    --good-bg: #e2f3ea;
+    --warn: #8f5200;
+    --warn-bg: #fbeed6;
+    --bad: #a8221b;
+    --bad-bg: #fbe4e2;
+    --stage: #0c1413;
+    --track: #d9e2e1;
+    --zone-low: #8fa3a1;
+    --zone-quiet: #d9a23a;
+    --zone-good: #2f9d63;
+    --zone-hot: #d6453d;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1313;
+      --surface: #151d1d;
+      --ink: #e7efee;
+      --muted: #a6b8b5;
+      --line: #2c3b3a;
+      --accent: #63d2d0;
+      --on-accent: #04201f;
+      --focus: #8fe6e4;
+      --good: #62d493;
+      --good-bg: #14301f;
+      --warn: #f2b552;
+      --warn-bg: #35280f;
+      --bad: #ff948c;
+      --bad-bg: #3a1815;
+      --stage: #070c0c;
+      --track: #223030;
+      --zone-low: #4f6361;
+      --zone-quiet: #c48f2c;
+      --zone-good: #3fbf7c;
+      --zone-hot: #ef5a50;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { font-size: 106.25%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 1.5rem max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left));
+    display: grid;
+    gap: 1rem;
+  }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 .4rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.25rem; line-height: 1.25; margin: 0 0 .75rem; }
+  p { margin: 0 0 .75rem; }
+  .lede { max-width: 42rem; color: var(--muted); margin: 0; }
+  .small { font-size: .9rem; color: var(--muted); }
+
+  .vh {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .skip {
+    position: absolute; left: .5rem; top: -4rem; z-index: 10;
+    background: var(--accent); color: var(--on-accent);
+    padding: .6rem 1rem; border-radius: .5rem; font-weight: 600;
+  }
+  .skip:focus { top: .5rem; }
+
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: .75rem;
+    padding: 1.1rem 1.25rem;
+    min-width: 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 62rem) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .btn {
+    font: inherit; font-weight: 650;
+    min-height: 2.75rem; padding: .55rem 1.15rem;
+    border-radius: .5rem; border: 2px solid var(--accent);
+    background: var(--accent); color: var(--on-accent);
+    cursor: pointer;
+  }
+  .btn.secondary { background: transparent; color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .control-row { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+  .selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+  .field { display: grid; gap: .3rem; min-width: 0; }
+  .field label { font-weight: 650; }
+  select {
+    font: inherit; min-height: 2.75rem; padding: .4rem .6rem; max-width: 100%;
+    border: 1px solid var(--line); border-radius: .5rem;
+    background: var(--surface); color: var(--ink);
+  }
+  fieldset.opts { border: 1px solid var(--line); border-radius: .5rem; padding: .6rem .9rem .75rem; margin: 0; display: grid; gap: .45rem; }
+  fieldset.opts legend { font-weight: 650; padding: 0 .3rem; }
+  fieldset.opts label { display: flex; gap: .6rem; align-items: flex-start; }
+  fieldset.opts input { width: 1.2rem; height: 1.2rem; margin-top: .22rem; accent-color: var(--accent); flex: none; }
+
+  .notice { border-radius: .5rem; padding: .7rem .9rem; margin-bottom: 1rem; font-weight: 600; }
+  .notice[data-kind="error"] { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad); }
+  .notice[data-kind="warn"] { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+
+  .coach {
+    font-size: 1.45rem; font-weight: 650; line-height: 1.3;
+    margin: 0 0 .75rem; min-height: 3.9rem; text-wrap: balance;
+  }
+  .stage {
+    position: relative; overflow: hidden;
+    background: var(--stage); border-radius: .6rem;
+    aspect-ratio: 16 / 9; width: 100%;
+  }
+  .stage-inner { position: absolute; inset: 0; }
+  .stage-inner.mirror { transform: scaleX(-1); }
+  .stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .placeholder {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    padding: 1rem; margin: 0; color: #cfe0de;
+  }
+  .stage-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: .75rem; }
+
+  .checks { list-style: none; margin: 0; padding: 0; }
+  .check { padding: .75rem 0; border-top: 1px solid var(--line); }
+  .check:first-child { border-top: 0; padding-top: 0; }
+  .check-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+  .check-name { font-weight: 650; }
+  .check-text { margin: .25rem 0 0; }
+  .pill {
+    font-size: .78rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: .12rem .6rem; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap;
+  }
+  .check[data-state="good"] .pill { color: var(--good); background: var(--good-bg); }
+  .check[data-state="adjust"] .pill { color: var(--warn); background: var(--warn-bg); }
+  .check[data-state="unknown"] .pill, .check[data-state="untested"] .pill { color: var(--muted); border-style: dashed; }
+
+  .sound-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  @media (max-width: 62rem) { .sound-grid { grid-template-columns: minmax(0, 1fr); } }
+  .meter-label { display: flex; justify-content: space-between; gap: 1rem; font-weight: 650; margin-bottom: .4rem; }
+  .num { font-variant-numeric: tabular-nums; }
+  .meter { position: relative; height: 1.5rem; border-radius: .4rem; overflow: hidden; border: 1px solid var(--line); }
+  .meter-cover { position: absolute; top: 0; bottom: 0; right: 0; left: 0; background: var(--track); transition: left 60ms linear; }
+  .zones { position: relative; height: 1.4rem; margin: .25rem 0 1rem; font-size: .85rem; color: var(--muted); }
+  .zones span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+  #report p:last-child { margin-bottom: 0; }
+  details { border-top: 1px solid var(--line); padding: .6rem 0; }
+  details:first-of-type { border-top: 0; }
+  summary { cursor: pointer; font-weight: 650; padding: .25rem 0; }
+  details p { margin: .5rem 0 0; max-width: 46rem; }
+
+  @media (prefers-reduced-motion: reduce) { .meter-cover { transition: none; } }
+  @media (forced-colors: active) {
+    .pill, .panel, .meter { border: 1px solid CanvasText; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#picture-h">Skip to results</a>
+<noscript><p>This page needs JavaScript to check your camera and microphone.</p></noscript>
+
+<div class="wrap">
+  <header>
+    <h1>Video Setup Check</h1>
+    <p class="lede">Check your framing, lighting and microphone before you record or join a call. Everything runs in your browser. Nothing is recorded or uploaded.</p>
+  </header>
+
+  <main id="main" style="display:grid; gap:1rem;">
+    <section class="panel" aria-labelledby="controls-h">
+      <h2 id="controls-h">Camera and microphone</h2>
+      <div class="control-row">
+        <button type="button" id="startBtn" class="btn">Start camera and microphone</button>
+      </div>
+      <div id="errorBox" class="notice" role="alert" hidden></div>
+      <div class="selects">
+        <div class="field">
+          <label for="camSel">Camera</label>
+          <select id="camSel" disabled><option>Press Start first</option></select>
+        </div>
+        <div class="field">
+          <label for="micSel">Microphone</label>
+          <select id="micSel" disabled><option>Press Start first</option></select>
+        </div>
+      </div>
+      <fieldset class="opts">
+        <legend>Options</legend>
+        <label><input type="checkbox" id="optAnnounce" checked> Announce changes as I adjust</label>
+        <label><input type="checkbox" id="optSpeak"> Speak announcements with the browser voice (leave this off if you use a screen reader)</label>
+        <label><input type="checkbox" id="optMirror" checked> Mirror the preview. This does not change what is recorded.</label>
+        <label><input type="checkbox" id="optGuides" checked> Show framing guides on the preview</label>
+      </fieldset>
+    </section>
+
+    <div class="grid">
+      <section class="panel" aria-labelledby="preview-h">
+        <h2 id="preview-h">Preview</h2>
+        <p id="coach" class="coach">Press Start to begin.</p>
+        <div class="stage-actions">
+          <button type="button" id="describeBtn" class="btn secondary" disabled>Describe my setup</button>
+        </div>
+        <div class="stage" id="stage">
+          <div class="stage-inner mirror" id="stageInner" hidden>
+            <video id="video" autoplay muted playsinline aria-label="Live camera preview. Results are listed in the sections beside and below."></video>
+            <canvas id="overlay" aria-hidden="true"></canvas>
+          </div>
+          <p class="placeholder" id="placeholder">The camera preview appears here after you press Start.</p>
+        </div>
+        <p class="small" style="margin:.75rem 0 0">Left and right advice is from your point of view, as you sit in front of the camera.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="picture-h">
+        <h2 id="picture-h">Picture</h2>
+        <ul class="checks" id="pictureList"></ul>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="sound-h">
+      <h2 id="sound-h">Sound</h2>
+      <div class="sound-grid">
+        <div>
+          <div class="meter-label"><span>Microphone level now</span><span id="meterValue" class="num">Off</span></div>
+          <div class="meter" id="meter" aria-hidden="true"><div class="meter-cover" id="meterCover"></div></div>
+          <div class="zones" id="zones" aria-hidden="true"><span id="zoneLow">Too quiet</span><span id="zoneGood">Good</span><span id="zoneHot">Too loud</span></div>
+          <p>The voice test stays silent for two seconds to measure room noise, plays a beep, then listens to you speak for six seconds.</p>
+          <button type="button" id="voiceBtn" class="btn" disabled>Test my voice</button>
+          <p id="voiceStatus" class="small" style="margin-top:.75rem"></p>
+        </div>
+        <ul class="checks" id="soundList"></ul>
+      </div>
+    </section>
+
+    <section class="panel" id="reportPanel" aria-labelledby="report-h" hidden>
+      <h2 id="report-h">Setup summary</h2>
+      <div id="report"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="help-h">
+      <h2 id="help-h">Help</h2>
+      <details>
+        <summary>The browser did not ask for permission, or says access is blocked</summary>
+        <p>Choose the camera or padlock icon in the browser address bar, allow the camera and microphone for this site, then press Start again.</p>
+        <p><strong>Mac:</strong> open System Settings, then Privacy and Security, then Camera and Microphone, and turn on your browser.</p>
+        <p><strong>Windows:</strong> open Settings, then Privacy and security, then Camera and Microphone, and make sure access is on for apps and for your browser.</p>
+        <p>If the camera is busy, close other apps that may be using it, such as video call apps or recording software.</p>
+      </details>
+      <details>
+        <summary>How the checks work</summary>
+        <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
+        <p>The voice test turns off echo cancellation, noise suppression and automatic gain, so the numbers reflect what your microphone really records. Levels are in decibels relative to full scale. Around minus 20 is a healthy speaking level, and zero is the point where the sound distorts.</p>
+        <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
+      </details>
+      <details>
+        <summary>Supported browsers</summary>
+        <p>Current Chrome, Edge, Firefox and Safari on Mac and Windows. The page must be opened over https or from your own computer for the browser to allow camera access.</p>
+      </details>
+    </section>
+  </main>
+</div>
+
+<div id="live" class="vh" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+(() => {
+'use strict';
+
+const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+
+/* Thresholds. Change these to make the checks stricter or looser. */
+const CFG = {
+  detectEveryMs: 160,
+  evaluateEveryMs: 1000,
+  window: 7,
+  centerTolerance: 0.07,      // fraction of frame width
+  centerFar: 0.16,
+  faceHeightGood: [0.22, 0.5], // face box height as a fraction of frame height
+  faceHeightFar: 0.14,
+  faceHeightNear: 0.62,
+  topEdgeMin: 0.06,
+  topLowMax: 0.34,
+  bottomMax: 0.92,
+  tiltMaxDeg: 6,
+  faceDark: 50,               // 0 to 255 brightness
+  faceBright: 205,
+  frameDark: 40,
+  backlitGap: 45,
+  backlitMinBg: 110,
+  sideGap: 30,
+  minHeightPx: 720,
+  mic: { veryQuiet: -45, quiet: -34, loud: -9, clipPeak: 0.98, clipFrames: 3, floor: -70 },
+  noise: { quiet: -62, some: -50, minGap: 25 },
+  voice: { introMs: 5200, quietSec: 2, speakSec: 6 },
+};
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  start: $('startBtn'), describe: $('describeBtn'), error: $('errorBox'),
+  camSel: $('camSel'), micSel: $('micSel'),
+  optAnnounce: $('optAnnounce'), optSpeak: $('optSpeak'), optMirror: $('optMirror'), optGuides: $('optGuides'),
+  coach: $('coach'), stage: $('stage'), stageInner: $('stageInner'), video: $('video'), overlay: $('overlay'), placeholder: $('placeholder'),
+  pictureList: $('pictureList'), soundList: $('soundList'),
+  meter: $('meter'), meterCover: $('meterCover'), meterValue: $('meterValue'),
+  zoneLow: $('zoneLow'), zoneGood: $('zoneGood'), zoneHot: $('zoneHot'),
+  voiceBtn: $('voiceBtn'), voiceStatus: $('voiceStatus'),
+  reportPanel: $('reportPanel'), report: $('report'), live: $('live'),
+};
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const median = (arr) => {
+  if (!arr.length) return NaN;
+  const s = [...arr].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(q * (sorted.length - 1)))];
+const fmtDb = (v) => Math.round(v).toString().replace('-', '−') + ' dB';
+
+/* ---------- Preferences ---------- */
+const PREF_KEY = 'video-setup-check:v1';
+function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch (e) { return {}; } }
+function savePrefs() {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify({
+      announce: els.optAnnounce.checked, speak: els.optSpeak.checked,
+      mirror: els.optMirror.checked, guides: els.optGuides.checked,
+    }));
+  } catch (e) { /* storage unavailable, ignore */ }
+}
+(function applyPrefs() {
+  const p = loadPrefs();
+  if (p.announce === false) els.optAnnounce.checked = false;
+  if (p.speak === true) els.optSpeak.checked = true;
+  if (p.mirror === false) els.optMirror.checked = false;
+  if (p.guides === false) els.optGuides.checked = false;
+  els.stageInner.classList.toggle('mirror', els.optMirror.checked);
+})();
+
+/* ---------- State ---------- */
+const S = {
+  stream: null, videoTrack: null, audioTrack: null, camInfo: null,
+  audioCtx: null, analyser: null, srcNode: null, buf: null,
+  detector: null, detectorKind: 'none', detectorState: 'idle', detectorLoading: null, lastTs: 0,
+  timers: { detect: null, audio: null, evaluate: null },
+  busy: false, samples: [], lastFace: null, faceOk: false,
+  mic: { shown: -100, ticks: 0 },
+  voice: null, testing: false, testBuf: null,
+  announce: { cand: null, count: 0, spoken: null, at: 0 },
+};
+
+/* ---------- Announcements ---------- */
+function toLive(text) {
+  els.live.textContent = '';
+  setTimeout(() => { els.live.textContent = text; }, 60);
+}
+function say(text) {
+  if (!text) return;
+  if (els.optSpeak.checked && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+      return;
+    } catch (e) { /* fall through to the live region */ }
+  }
+  toLive(text);
+}
+
+/* ---------- Rows ---------- */
+const PICTURE_ROWS = [
+  ['camera', 'Camera'], ['face', 'Face'], ['center', 'Centering'], ['height', 'Height in frame'],
+  ['distance', 'Distance'], ['tilt', 'Tilt'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'],
+];
+const SOUND_ROWS = [['voice', 'Speaking level'], ['noise', 'Background noise'], ['clip', 'Distortion']];
+const STATE_LABEL = { good: 'Good', adjust: 'Adjust', unknown: 'Unknown', untested: 'Not tested' };
+const rowEls = {};
+
+function buildRows(list, defs) {
+  for (const [id, name] of defs) {
+    const li = document.createElement('li');
+    li.className = 'check';
+    li.dataset.state = 'unknown';
+    const head = document.createElement('div');
+    head.className = 'check-head';
+    const n = document.createElement('span');
+    n.className = 'check-name';
+    n.textContent = name;
+    const colon = document.createElement('span');
+    colon.className = 'vh';
+    colon.textContent = ': ';
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.textContent = STATE_LABEL.unknown;
+    const stop = document.createElement('span');
+    stop.className = 'vh';
+    stop.textContent = '. ';
+    const msg = document.createElement('p');
+    msg.className = 'check-text';
+    msg.textContent = 'Press Start to check this.';
+    head.append(n, colon, pill, stop);
+    li.append(head, msg);
+    list.appendChild(li);
+    rowEls[id] = { li, pill, msg, state: 'unknown', text: msg.textContent };
+  }
+}
+buildRows(els.pictureList, PICTURE_ROWS);
+buildRows(els.soundList, SOUND_ROWS);
+
+function setRow(id, state, text) {
+  const r = rowEls[id];
+  if (!r || (r.state === state && r.text === text)) return;
+  r.state = state;
+  r.text = text;
+  r.li.dataset.state = state;
+  r.pill.textContent = STATE_LABEL[state] || state;
+  r.msg.textContent = text;
+}
+
+/* ---------- Errors ---------- */
+function showNotice(text, kind) {
+  els.error.dataset.kind = kind || 'error';
+  els.error.hidden = false;
+  els.error.textContent = text;
+}
+function clearNotice() { els.error.hidden = true; els.error.textContent = ''; }
+
+function explainError(e) {
+  const n = e && e.name;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return 'This browser cannot open the camera here. Use a current Chrome, Edge, Firefox or Safari, and open this page over https or from your own computer.';
+  }
+  if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') {
+    return 'The browser was not allowed to use your camera or microphone. Allow access in the address bar, then press Start again. If you already allowed it, check your system privacy settings in the Help section below.';
+  }
+  if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No camera or microphone was found. Plug one in, then press Start again.';
+  if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') {
+    return 'The camera or microphone is busy. Close other apps or browser tabs that may be using it, then press Start again.';
+  }
+  if (n === 'OverconstrainedError') return 'The selected device could not be used. Choose another one from the list.';
+  return 'Could not start the camera or microphone' + (n ? ' (' + n + ').' : '.');
+}
+
+/* ---------- Opening the devices ---------- */
+async function openMedia(camId, micId, retried) {
+  const video = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
+  if (camId) video.deviceId = { exact: camId };
+  const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  if (micId) audio.deviceId = { exact: micId };
+  const attempts = [
+    { video, audio, kind: 'both' },
+    { video, audio: false, kind: 'video' },
+    { video: false, audio, kind: 'audio' },
+  ];
+  let firstErr = null;
+  for (const a of attempts) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: a.video, audio: a.audio });
+      return { stream, kind: a.kind, err: firstErr };
+    } catch (e) {
+      if (!firstErr) firstErr = e;
+    }
+  }
+  if (!retried && (camId || micId)) return openMedia('', '', true);
+  throw firstErr;
+}
+
+async function refreshDevices() {
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    fillSelect(els.camSel, devs.filter((d) => d.kind === 'videoinput'), 'Camera',
+      S.videoTrack && S.videoTrack.getSettings().deviceId);
+    fillSelect(els.micSel, devs.filter((d) => d.kind === 'audioinput'), 'Microphone',
+      S.audioTrack && S.audioTrack.getSettings().deviceId);
+  } catch (e) { /* ignore */ }
+}
+function fillSelect(sel, list, fallback, activeId) {
+  sel.replaceChildren();
+  if (!list.length) {
+    const o = document.createElement('option');
+    o.textContent = 'None found';
+    sel.appendChild(o);
+    sel.disabled = true;
+    return;
+  }
+  list.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || (fallback + ' ' + (i + 1));
+    sel.appendChild(o);
+  });
+  if (activeId && list.some((d) => d.deviceId === activeId)) sel.value = activeId;
+  sel.disabled = false;
+}
+
+function whenMetadata(v) {
+  return new Promise((resolve) => {
+    if (v.readyState >= 1 && v.videoWidth) return resolve();
+    const done = () => { v.removeEventListener('loadedmetadata', done); resolve(); };
+    v.addEventListener('loadedmetadata', done);
+    setTimeout(done, 4000);
+  });
+}
+
+/* ---------- Start and stop ---------- */
+async function start() {
+  clearNotice();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showNotice(explainError(null));
+    return;
+  }
+  els.start.disabled = true;
+  els.start.textContent = 'Starting…';
+  const camId = S.stream ? els.camSel.value : '';
+  const micId = S.stream ? els.micSel.value : '';
+  stopStream();
+  try {
+    const res = await openMedia(camId, micId);
+    await attach(res);
+  } catch (e) {
+    showNotice(explainError(e));
+    resetUi();
+  } finally {
+    els.start.disabled = false;
+  }
+}
+
+async function attach({ stream, kind, err }) {
+  S.stream = stream;
+  S.videoTrack = stream.getVideoTracks()[0] || null;
+  S.audioTrack = stream.getAudioTracks()[0] || null;
+  S.samples = [];
+  S.voice = null;
+  S.camInfo = null;
+  S.announce = { cand: null, count: 0, spoken: null, at: 0 };
+  for (const t of [S.videoTrack, S.audioTrack]) if (t) t.addEventListener('ended', onTrackEnded);
+
+  if (S.videoTrack) {
+    els.video.srcObject = new MediaStream([S.videoTrack]);
+    try { await els.video.play(); } catch (e) { /* autoplay is allowed for muted video */ }
+    await whenMetadata(els.video);
+    const st = S.videoTrack.getSettings();
+    const w = st.width || els.video.videoWidth;
+    const h = st.height || els.video.videoHeight;
+    S.camInfo = { label: S.videoTrack.label || 'Camera', width: w, height: h, fps: st.frameRate };
+    if (w && h) els.stage.style.aspectRatio = w + ' / ' + h;
+    els.stageInner.hidden = false;
+    els.placeholder.hidden = true;
+    els.stageInner.classList.toggle('mirror', els.optMirror.checked);
+  } else {
+    els.stageInner.hidden = true;
+    els.placeholder.hidden = false;
+    els.placeholder.textContent = 'No camera is running. Microphone checks are still available.';
+  }
+  if (S.audioTrack) setupAudio(S.audioTrack);
+
+  await refreshDevices();
+  if (navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+
+  if (kind === 'video') showNotice('The microphone could not be started: ' + explainError(err) + ' Camera checks still work.', 'warn');
+  if (kind === 'audio') showNotice('The camera could not be started: ' + explainError(err) + ' Microphone checks still work.', 'warn');
+
+  els.start.textContent = 'Stop camera and microphone';
+  els.describe.disabled = false;
+  els.voiceBtn.disabled = !S.analyser;
+  S.timers.evaluate = setInterval(evaluateAndRender, CFG.evaluateEveryMs);
+  if (S.videoTrack) {
+    S.timers.detect = setInterval(tick, CFG.detectEveryMs);
+    loadDetector();
+  }
+  evaluateAndRender();
+  renderSound();
+  say('Camera and microphone are on. Move into view and I will tell you how to adjust.');
+}
+
+function onTrackEnded() {
+  showNotice('A camera or microphone was disconnected. Press Start to try again.');
+  stop();
+}
+
+function stopStream() {
+  clearInterval(S.timers.detect);
+  clearInterval(S.timers.audio);
+  clearInterval(S.timers.evaluate);
+  if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
+  if (S.audioCtx) { try { S.audioCtx.close(); } catch (e) { /* ignore */ } }
+  if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) {
+    navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
+  }
+  S.stream = null; S.videoTrack = null; S.audioTrack = null; S.camInfo = null;
+  S.audioCtx = null; S.analyser = null; S.srcNode = null; S.buf = null;
+  S.lastFace = null; S.samples = [];
+  S.mic.shown = -100;
+  els.video.srcObject = null;
+}
+
+function stop() {
+  const wasRunning = !!S.stream;
+  stopStream();
+  resetUi();
+  if (wasRunning) say('Camera and microphone are off.');
+}
+
+function resetUi() {
+  els.start.textContent = 'Start camera and microphone';
+  els.start.disabled = false;
+  els.describe.disabled = true;
+  els.voiceBtn.disabled = true;
+  els.voiceStatus.textContent = '';
+  els.stageInner.hidden = true;
+  els.placeholder.hidden = false;
+  els.placeholder.textContent = 'The camera preview appears here after you press Start.';
+  els.camSel.disabled = true;
+  els.micSel.disabled = true;
+  els.coach.textContent = 'Press Start to begin.';
+  els.meterValue.textContent = 'Off';
+  els.meterCover.style.left = '0%';
+  const c = els.overlay.getContext('2d');
+  c.clearRect(0, 0, els.overlay.width, els.overlay.height);
+  renderPicture();
+  renderSound();
+}
+
+/* ---------- Face detection ---------- */
+function loadDetector() {
+  if (S.detectorLoading) return S.detectorLoading;
+  S.detectorState = 'loading';
+  S.detectorLoading = (async () => {
+    try {
+      const mod = await import(MP_BASE + '/vision_bundle.mjs');
+      const fileset = await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
+      const make = (delegate) => mod.FaceDetector.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL_URL, delegate },
+        runningMode: 'VIDEO',
+        minDetectionConfidence: 0.5,
+      });
+      try { S.detector = await make('GPU'); } catch (e) { S.detector = await make('CPU'); }
+      S.detectorKind = 'mediapipe';
+    } catch (e) {
+      console.warn('MediaPipe face detector did not load', e);
+      if ('FaceDetector' in window) {
+        try { S.detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 3 }); S.detectorKind = 'native'; } catch (e2) { /* none */ }
+      }
+    }
+    S.detectorState = S.detector ? 'ready' : 'unavailable';
+    evaluateAndRender();
+  })();
+  return S.detectorLoading;
+}
+
+async function detectFaces() {
+  const v = els.video;
+  const W = v.videoWidth, H = v.videoHeight;
+  if (!W || !H || !S.detector) return [];
+  if (S.detectorKind === 'mediapipe') {
+    const ts = Math.max(performance.now(), S.lastTs + 1);
+    S.lastTs = ts;
+    const r = S.detector.detectForVideo(v, ts);
+    return (r.detections || []).map((d) => {
+      const b = d.boundingBox;
+      const k = d.keypoints || [];
+      return {
+        x: b.originX / W, y: b.originY / H, w: b.width / W, h: b.height / H,
+        eyes: k.length >= 2 ? { r: k[0], l: k[1] } : null,
+      };
+    });
+  }
+  const found = await S.detector.detect(v);
+  return found.map((f) => {
+    const b = f.boundingBox;
+    return { x: b.x / W, y: b.y / H, w: b.width / W, h: b.height / H, eyes: null };
+  });
+}
+
+function pickFace(faces) {
+  if (!faces.length) return null;
+  const f = faces.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
+  let tilt = NaN;
+  if (f.eyes) {
+    const dx = (f.eyes.l.x - f.eyes.r.x) * els.video.videoWidth;
+    const dy = (f.eyes.l.y - f.eyes.r.y) * els.video.videoHeight;
+    tilt = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (tilt > 90) tilt -= 180;
+    if (tilt < -90) tilt += 180;
+  }
+  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, tilt, count: faces.length };
+}
+
+const SC = document.createElement('canvas');
+SC.width = 160; SC.height = 90;
+const sctx = SC.getContext('2d', { willReadFrequently: true });
+function sampleLuma(face) {
+  const v = els.video;
+  const W = 160;
+  const H = Math.max(1, Math.round(160 * v.videoHeight / v.videoWidth));
+  if (SC.height !== H) SC.height = H;
+  sctx.drawImage(v, 0, 0, W, H);
+  const d = sctx.getImageData(0, 0, W, H).data;
+  let as = 0, an = 0, fs = 0, fn = 0, bs = 0, bn = 0, ls = 0, ln = 0, rs = 0, rn = 0;
+  let ix0 = 0, ix1 = 0, iy0 = 0, iy1 = 0, ex0 = 0, ex1 = 0, ey0 = 0, cxp = 0;
+  if (face) {
+    ix0 = (face.cx - face.w * 0.35) * W; ix1 = (face.cx + face.w * 0.35) * W;
+    iy0 = (face.top + face.h * 0.25) * H; iy1 = (face.top + face.h * 0.85) * H;
+    ex0 = (face.cx - face.w * 1.1) * W; ex1 = (face.cx + face.w * 1.1) * W;
+    ey0 = (face.top - face.h * 0.6) * H;
+    cxp = face.cx * W;
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      as += l; an++;
+      if (!face) continue;
+      if (x >= ix0 && x <= ix1 && y >= iy0 && y <= iy1) {
+        fs += l; fn++;
+        if (x < cxp) { ls += l; ln++; } else { rs += l; rn++; }
+      } else if (!(x >= ex0 && x <= ex1 && y >= ey0)) {
+        bs += l; bn++;
+      }
+    }
+  }
+  return {
+    frame: as / an,
+    face: fn ? fs / fn : null,
+    imgLeft: ln ? ls / ln : null,
+    imgRight: rn ? rs / rn : null,
+    bg: bn ? bs / bn : null,
+  };
+}
+
+async function tick() {
+  if (S.busy || !S.stream || document.hidden) return;
+  const v = els.video;
+  if (v.readyState < 2 || !v.videoWidth) return;
+  S.busy = true;
+  try {
+    const faces = S.detectorState === 'ready' ? await detectFaces() : [];
+    const face = pickFace(faces);
+    const luma = sampleLuma(face);
+    S.samples.push({ face, luma });
+    if (S.samples.length > 30) S.samples.shift();
+    S.lastFace = face;
+    drawOverlay();
+  } catch (e) {
+    console.warn(e);
+  } finally {
+    S.busy = false;
+  }
+}
+
+/* ---------- Overlay ---------- */
+function drawOverlay() {
+  const c = els.overlay;
+  const rect = els.stageInner.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(rect.width * dpr));
+  const h = Math.max(1, Math.round(rect.height * dpr));
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, w, h);
+  if (!els.optGuides.checked || !S.stream) return;
+  const lw = Math.max(2, 2 * dpr);
+  const line = (draw, color, width, dash) => {
+    g.save(); g.setLineDash(dash || []); g.lineWidth = width; g.strokeStyle = color; draw(); g.restore();
+  };
+  const both = (draw, color, dash) => {
+    line(draw, 'rgba(0,0,0,0.65)', lw + 2 * dpr, dash);
+    line(draw, color, lw, dash);
+  };
+  both(() => {
+    g.beginPath();
+    for (const t of [1 / 3, 2 / 3]) { g.moveTo(w * t, 0); g.lineTo(w * t, h); g.moveTo(0, h * t); g.lineTo(w, h * t); }
+    g.stroke();
+  }, 'rgba(255,255,255,0.35)');
+  both(() => { g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.stroke(); }, 'rgba(255,255,255,0.85)', [10 * dpr, 8 * dpr]);
+  const th = 0.36, tt = 0.2;
+  const tw = th * h * 0.78;
+  both(() => g.strokeRect(w / 2 - tw / 2, tt * h, tw, th * h), 'rgba(255,255,255,0.9)', [4 * dpr, 6 * dpr]);
+  const f = S.lastFace;
+  if (f) {
+    const color = S.faceOk ? '#4ade80' : '#fbbf24';
+    both(() => g.strokeRect((f.cx - f.w / 2) * w, f.top * h, f.w * w, f.h * h), color);
+  }
+}
+new ResizeObserver(drawOverlay).observe(els.stageInner);
+
+/* ---------- Audio ---------- */
+function setupAudio(track) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  S.audioCtx = new AC();
+  if (S.audioCtx.state === 'suspended') S.audioCtx.resume().catch(() => {});
+  S.srcNode = S.audioCtx.createMediaStreamSource(new MediaStream([track]));
+  S.analyser = S.audioCtx.createAnalyser();
+  S.analyser.fftSize = 2048;
+  S.analyser.smoothingTimeConstant = 0;
+  S.srcNode.connect(S.analyser);
+  S.buf = new Float32Array(S.analyser.fftSize);
+  S.mic.shown = -100; S.mic.ticks = 0;
+  S.timers.audio = setInterval(audioTick, 50);
+}
+
+function audioTick() {
+  if (!S.analyser) return;
+  S.analyser.getFloatTimeDomainData(S.buf);
+  let sum = 0, peak = 0;
+  for (let i = 0; i < S.buf.length; i++) {
+    const v = S.buf[i];
+    sum += v * v;
+    const a = Math.abs(v);
+    if (a > peak) peak = a;
+  }
+  const rms = Math.sqrt(sum / S.buf.length);
+  const db = rms > 0 ? 20 * Math.log10(rms) : -100;
+  if (S.testBuf) S.testBuf.push({ db, peak });
+  S.mic.shown = db > S.mic.shown ? db : S.mic.shown - 1.5;
+  const p = clamp((S.mic.shown - CFG.mic.floor) / -CFG.mic.floor, 0, 1);
+  els.meterCover.style.left = (p * 100).toFixed(1) + '%';
+  if (++S.mic.ticks % 10 === 0) {
+    els.meterValue.textContent = S.mic.shown < CFG.mic.floor ? 'No signal' : fmtDb(S.mic.shown);
+  }
+}
+
+function initMeter() {
+  const z = (db) => ((db - CFG.mic.floor) / -CFG.mic.floor * 100);
+  const a = z(CFG.mic.veryQuiet), b = z(CFG.mic.quiet), c = z(CFG.mic.loud);
+  els.meter.style.background =
+    'linear-gradient(to right, var(--zone-low) 0 ' + a + '%, var(--zone-quiet) ' + a + '% ' + b + '%, var(--zone-good) ' + b + '% ' + c + '%, var(--zone-hot) ' + c + '% 100%)';
+  els.zoneLow.style.left = (b / 2) + '%';
+  els.zoneGood.style.left = ((b + c) / 2) + '%';
+  els.zoneHot.style.left = ((c + 100) / 2) + '%';
+}
+initMeter();
+
+function beep(freq, dur, when) {
+  if (!S.audioCtx) return;
+  const t0 = S.audioCtx.currentTime + (when || 0);
+  const o = S.audioCtx.createOscillator();
+  const g = S.audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(S.audioCtx.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.02);
+}
+
+async function countdown(sec, label) {
+  const end = performance.now() + sec * 1000;
+  while (performance.now() < end) {
+    els.voiceStatus.textContent = label + '… ' + Math.ceil((end - performance.now()) / 1000);
+    await sleep(200);
+  }
+}
+
+async function runVoiceTest() {
+  if (!S.analyser || S.testing) return;
+  const T = CFG.voice;
+  S.testing = true;
+  els.voiceBtn.disabled = true;
+  S.voice = null;
+  renderSound();
+  try {
+    say('Voice test. First stay silent for ' + T.quietSec + ' seconds. After the beep, speak normally for ' + T.speakSec + ' seconds. A lower beep marks the end.');
+    els.voiceStatus.textContent = 'Get ready…';
+    await sleep(T.introMs);
+    if (!S.analyser) return;
+    S.testBuf = [];
+    await countdown(T.quietSec, 'Stay silent');
+    const quiet = S.testBuf || [];
+    if (!S.analyser) return;
+    beep(880, 0.18);
+    await sleep(500);
+    S.testBuf = [];
+    await countdown(T.speakSec, 'Speak now');
+    const speech = S.testBuf || [];
+    S.testBuf = null;
+    if (!S.analyser) return;
+    beep(520, 0.15);
+    beep(520, 0.15, 0.22);
+    els.voiceStatus.textContent = 'Test finished.';
+    S.voice = analyseVoice(quiet, speech);
+    renderSound();
+    const rows = evaluateSound();
+    say('Voice test finished. ' + rows.map((r) => r.text).join(' '));
+  } finally {
+    S.testBuf = null;
+    S.testing = false;
+    els.voiceBtn.disabled = !S.analyser;
+  }
+}
+
+function analyseVoice(quiet, speech) {
+  if (quiet.length < 10 || speech.length < 20) return null;
+  const q = quiet.map((f) => f.db).sort((a, b) => a - b);
+  const s = speech.map((f) => f.db).sort((a, b) => a - b);
+  const noise = pct(q, 0.5);
+  const level = pct(s, 0.9);
+  const peak = Math.max(...speech.map((f) => f.peak));
+  const clips = speech.filter((f) => f.peak >= CFG.mic.clipPeak).length;
+  const heard = (level - noise) >= 10 && level > -65;
+  return { noise, level, peak, clips, heard };
+}
+
+/* ---------- Evaluation: sound ---------- */
+function evaluateSound() {
+  const out = [];
+  const push = (id, state, text) => out.push({ id, state, text });
+  if (!S.analyser) {
+    for (const [id] of SOUND_ROWS) push(id, 'unknown', S.stream ? 'No microphone is running.' : 'Press Start to check this.');
+    return out;
+  }
+  const v = S.voice;
+  if (!v) {
+    const msg = S.testing ? 'Voice test in progress.' : 'Run the voice test to check this.';
+    for (const [id] of SOUND_ROWS) push(id, 'untested', msg);
+    return out;
+  }
+  const M = CFG.mic, N = CFG.noise;
+  if (!v.heard) {
+    push('voice', 'adjust', 'I did not hear speech during the test. Try again, speak a little louder, and check that the right microphone is selected.');
+    push('noise', 'unknown', 'Room noise measured at about ' + fmtDb(v.noise) + ', but the test did not hear speech.');
+    push('clip', 'unknown', 'Needs a successful voice test.');
+    return out;
+  }
+  const lv = fmtDb(v.level);
+  if (v.level < M.veryQuiet) push('voice', 'adjust', 'Your voice is very quiet, about ' + lv + '. Raise the microphone input volume, move closer to the microphone, or choose another microphone. On a Mac, use System Settings, Sound, Input. On Windows, use Settings, System, Sound, Input.');
+  else if (v.level < M.quiet) push('voice', 'adjust', 'Your voice is a little quiet, about ' + lv + '. Move closer to the microphone or raise its input volume.');
+  else if (v.level > M.loud) push('voice', 'adjust', 'Your voice is very loud, about ' + lv + '. Lower the input volume or move back from the microphone.');
+  else push('voice', 'good', 'Your voice level is good, about ' + lv + '.');
+
+  const nz = fmtDb(v.noise);
+  const gap = Math.round(v.level - v.noise);
+  if (v.noise > N.some) push('noise', 'adjust', 'There is noticeable background noise, about ' + nz + '. Close windows, turn off fans or other noise sources, or move the microphone closer to you.');
+  else if (gap < N.minGap) push('noise', 'adjust', 'Your voice is only ' + gap + ' dB louder than the room noise, which is about ' + nz + '. Move closer to the microphone or reduce the noise.');
+  else if (v.noise > N.quiet) push('noise', 'good', 'There is a little background noise, about ' + nz + '. That is fine for most recordings.');
+  else push('noise', 'good', 'The room is quiet, about ' + nz + '.');
+
+  if (v.clips >= M.clipFrames) push('clip', 'adjust', 'Your voice distorted at times. Lower the microphone input volume or speak further from it.');
+  else push('clip', 'good', 'No distortion heard.');
+  return out;
+}
+function renderSound() { for (const r of evaluateSound()) setRow(r.id, r.state, r.text); }
+
+/* ---------- Evaluation: picture ---------- */
+function currentFace() {
+  const win = S.samples.slice(-CFG.window);
+  if (win.length < 3) return { ready: false, found: false };
+  const withFace = win.filter((s) => s.face);
+  if (withFace.length < Math.ceil(win.length / 2)) return { ready: true, found: false };
+  const m = (fn) => median(withFace.map(fn));
+  const num = (fn) => { const a = withFace.map(fn).filter(Number.isFinite); return a.length ? median(a) : NaN; };
+  return {
+    ready: true, found: true,
+    count: Math.round(m((s) => s.face.count)),
+    cx: m((s) => s.face.cx), top: m((s) => s.face.top), bottom: m((s) => s.face.bottom), h: m((s) => s.face.h),
+    tilt: num((s) => s.face.tilt),
+    lFace: num((s) => s.luma.face), lLeft: num((s) => s.luma.imgLeft), lRight: num((s) => s.luma.imgRight), lBg: num((s) => s.luma.bg),
+  };
+}
+
+function evaluatePicture() {
+  const out = [];
+  const push = (id, state, text, pri, key) => out.push({ id, state, text, pri, key: key || id });
+  const wait = (ids, text) => ids.forEach((id) => push(id, 'unknown', text, 99));
+
+  if (!S.videoTrack) {
+    const msg = S.stream ? 'No camera is running.' : 'Press Start to check this.';
+    for (const [id] of PICTURE_ROWS) push(id, 'unknown', msg, 99);
+    return out;
+  }
+
+  const ci = S.camInfo;
+  if (ci) {
+    const res = ci.width + ' by ' + ci.height + (ci.fps ? ' at ' + Math.round(ci.fps) + ' frames per second' : '');
+    if (ci.height && ci.height < CFG.minHeightPx) push('camera', 'adjust', ci.label + ', ' + res + '. That is below HD. Close other apps that use the camera, or choose another camera.', 9);
+    else push('camera', 'good', ci.label + ', ' + res + '.', 9);
+  } else {
+    push('camera', 'unknown', 'Reading camera details.', 99);
+  }
+
+  const f = currentFace();
+  const faceDeps = ['center', 'height', 'distance', 'tilt'];
+  if (S.detectorState === 'idle' || S.detectorState === 'loading') {
+    push('face', 'unknown', 'Loading the face detector. This can take a few seconds the first time.', 99);
+    wait(faceDeps, 'Waiting for the face detector.');
+  } else if (S.detectorState === 'unavailable') {
+    push('face', 'unknown', 'Face checks are not available because the face detector could not load. Check your internet connection and reload the page. Lighting and sound checks still work.', 99);
+    wait(faceDeps, 'Needs the face detector.');
+  } else if (!f.ready) {
+    push('face', 'unknown', 'Looking for your face.', 99);
+    wait(faceDeps, 'Looking for your face.');
+  } else if (!f.found) {
+    push('face', 'adjust', 'I cannot see your face. Face the camera, make sure the lens is not covered, and check the lighting.', 1, 'face:none');
+    wait(faceDeps, 'Needs a visible face.');
+  } else {
+    if (f.count > 1) push('face', 'adjust', 'I can see ' + f.count + ' faces. The checks use the largest one.', 8, 'face:multi');
+    else push('face', 'good', 'I can see one face.', 8);
+
+    const dx = f.cx - 0.5;
+    const adx = Math.abs(dx);
+    if (adx <= CFG.centerTolerance) push('center', 'good', 'You are centered.', 2);
+    else {
+      const dir = dx > 0 ? 'right' : 'left';
+      const far = adx > CFG.centerFar;
+      push('center', 'adjust', 'Move ' + (far ? '' : 'a little ') + 'to your ' + dir + '.', 2, 'center:' + dir + ':' + (far ? 'far' : 'near'));
+    }
+
+    if (f.top < CFG.topEdgeMin) push('height', 'adjust', 'Your head is touching the top of the picture. Tilt the camera up a little, or sit a little lower.', 3, 'height:top');
+    else if (f.bottom > CFG.bottomMax) push('height', 'adjust', 'Your chin is near the bottom of the picture. Tilt the camera down a little, or sit a little higher.', 3, 'height:bottom');
+    else if (f.top > CFG.topLowMax) push('height', 'adjust', 'There is a lot of empty space above your head. Tilt the camera down a little, or raise the camera.', 3, 'height:low');
+    else push('height', 'good', 'Your head sits well in the picture.', 3);
+
+    if (f.h < CFG.faceHeightGood[0]) {
+      const far = f.h < CFG.faceHeightFar;
+      push('distance', 'adjust', far ? 'You are far from the camera. Move closer, or zoom in if your camera allows.' : 'Move a little closer to the camera, or zoom in if your camera allows.', 4, 'distance:far:' + far);
+    } else if (f.h > CFG.faceHeightGood[1]) {
+      const near = f.h > CFG.faceHeightNear;
+      push('distance', 'adjust', near ? 'You are very close to the camera. Move back.' : 'Move back a little.', 4, 'distance:near:' + near);
+    } else push('distance', 'good', 'Your distance looks good for head and shoulders.', 4);
+
+    if (!Number.isFinite(f.tilt)) push('tilt', 'unknown', 'Tilt cannot be measured with this face detector.', 99);
+    else if (Math.abs(f.tilt) > CFG.tiltMaxDeg) push('tilt', 'adjust', 'Your head or the camera is tilted by about ' + Math.round(Math.abs(f.tilt)) + ' degrees. Level the camera or straighten your head.', 5, 'tilt');
+    else push('tilt', 'good', 'Your head and the camera look level.', 5);
+  }
+
+  const lumas = S.samples.slice(-CFG.window).map((s) => (s.luma ? s.luma.frame : NaN)).filter(Number.isFinite);
+  const frameLuma = lumas.length ? median(lumas) : NaN;
+  if (f.found && Number.isFinite(f.lFace)) {
+    const side = f.lLeft - f.lRight; // negative: image left is darker, which is your right side
+    if (f.lFace < CFG.faceDark) push('lightFace', 'adjust', 'Your face is quite dark. Add a light in front of you, behind the camera, or face a window.', 6, 'light:dark');
+    else if (f.lFace > CFG.faceBright) push('lightFace', 'adjust', 'Your face is very bright and may lose detail. Reduce the light on you or move away from the lamp.', 6, 'light:bright');
+    else if (Number.isFinite(side) && side < -CFG.sideGap) push('lightFace', 'adjust', 'Your right side is darker than your left. Add light from your right, or turn a little toward your main light.', 6, 'light:side:right');
+    else if (Number.isFinite(side) && side > CFG.sideGap) push('lightFace', 'adjust', 'Your left side is darker than your right. Add light from your left, or turn a little toward your main light.', 6, 'light:side:left');
+    else push('lightFace', 'good', 'Your face is evenly lit.', 6);
+
+    if (Number.isFinite(f.lBg) && (f.lBg - f.lFace) > CFG.backlitGap && f.lBg > CFG.backlitMinBg) {
+      push('lightBack', 'adjust', 'There is a bright light or window behind you. Face the light instead, or close the blinds.', 7, 'back');
+    } else if (Number.isFinite(f.lBg)) push('lightBack', 'good', 'Nothing bright behind you.', 7);
+    else push('lightBack', 'unknown', 'Could not measure the background.', 99);
+  } else if (Number.isFinite(frameLuma) && frameLuma < CFG.frameDark) {
+    push('lightFace', 'adjust', 'The whole picture is very dark. Turn on a light in front of you, or face a window.', 0, 'light:frame-dark');
+    push('lightBack', 'unknown', 'Needs a visible face.', 99);
+  } else {
+    push('lightFace', 'unknown', 'Needs a visible face.', 99);
+    push('lightBack', 'unknown', 'Needs a visible face.', 99);
+  }
+  return out;
+}
+function renderPicture() { for (const r of evaluatePicture()) setRow(r.id, r.state, r.text); }
+
+/* ---------- Coaching ---------- */
+function evaluateAndRender() {
+  if (!S.stream) return;
+  const rows = evaluatePicture();
+  for (const r of rows) setRow(r.id, r.state, r.text);
+  const issues = rows.filter((r) => r.state === 'adjust').sort((a, b) => a.pri - b.pri);
+  const top = issues[0] || null;
+  const f = currentFace();
+  S.faceOk = f.found && !issues.some((r) => ['center', 'height', 'distance'].includes(r.id));
+  let coach;
+  if (!S.videoTrack) coach = 'Microphone is on. Use Test my voice to check your sound.';
+  else if (top) coach = top.text;
+  else if (f.found) coach = 'Everything looks good. Hold this position.';
+  else if (S.detectorState === 'unavailable') coach = 'Face checks are unavailable. Lighting and sound checks still work.';
+  else coach = 'Getting ready…';
+  if (els.coach.textContent !== coach) els.coach.textContent = coach;
+  if (S.videoTrack) maybeAnnounce(top, f);
+}
+
+function maybeAnnounce(top, f) {
+  if (!els.optAnnounce.checked || S.testing) return;
+  const A = S.announce;
+  const now = Date.now();
+  let key;
+  if (top) key = top.key;
+  else if (f.found) key = 'ok';
+  else return;
+  if (key === A.cand) A.count++; else { A.cand = key; A.count = 1; }
+  if (A.count < 2) return;
+  const text = top ? top.text : 'Everything looks good. Hold this position.';
+  if (key !== A.spoken && now - A.at >= 3000) {
+    say(text); A.spoken = key; A.at = now;
+  } else if (key === A.spoken && key !== 'ok' && now - A.at >= 12000) {
+    say(text); A.at = now;
+  }
+}
+
+/* ---------- Summary ---------- */
+function buildReport() {
+  const pic = evaluatePicture();
+  const snd = evaluateSound();
+  const p1 = document.createElement('p');
+  const p2 = document.createElement('p');
+
+  if (!S.videoTrack) {
+    p1.textContent = 'Picture. No camera is running.';
+  } else {
+    const cam = pic.find((r) => r.id === 'camera');
+    const adjust = pic.filter((r) => r.state === 'adjust' && r.id !== 'camera').sort((a, b) => a.pri - b.pri);
+    const good = pic.filter((r) => r.state === 'good' && r.id !== 'camera').map((r) => rowName(r.id).toLowerCase());
+    const parts = ['Picture.'];
+    if (cam) parts.push(cam.text);
+    if (adjust.length) parts.push(adjust.length === 1 ? 'One thing to adjust.' : adjust.length + ' things to adjust.', ...adjust.map((r) => r.text));
+    else if (good.length) parts.push('Framing and lighting look good.');
+    if (adjust.length && good.length) parts.push('These look good: ' + good.join(', ') + '.');
+    if (!adjust.length && !good.length) parts.push('I do not have enough information about the framing yet. Give it a few seconds.');
+    p1.textContent = parts.join(' ');
+  }
+
+  if (!S.analyser) p2.textContent = 'Sound. No microphone is running.';
+  else if (!S.voice) p2.textContent = 'Sound. The voice test has not been run yet. Choose Test my voice.';
+  else p2.textContent = 'Sound. ' + snd.map((r) => r.text).join(' ');
+  return [p1, p2];
+}
+function rowName(id) { const d = PICTURE_ROWS.find((r) => r[0] === id); return d ? d[1] : id; }
+
+function describeSetup() {
+  if (!S.stream) { say('Start the camera first.'); return; }
+  const [p1, p2] = buildReport();
+  els.report.replaceChildren(p1, p2);
+  els.reportPanel.hidden = false;
+  S.announce.at = Date.now() + 6000;
+  say(p1.textContent + ' ' + p2.textContent);
+}
+
+/* ---------- Wiring ---------- */
+els.start.addEventListener('click', () => { if (S.stream) stop(); else start(); });
+els.describe.addEventListener('click', describeSetup);
+els.voiceBtn.addEventListener('click', runVoiceTest);
+els.camSel.addEventListener('change', () => { if (S.stream) start(); });
+els.micSel.addEventListener('change', () => { if (S.stream) start(); });
+els.optMirror.addEventListener('change', () => { els.stageInner.classList.toggle('mirror', els.optMirror.checked); savePrefs(); });
+els.optGuides.addEventListener('change', () => { drawOverlay(); savePrefs(); });
+els.optAnnounce.addEventListener('change', savePrefs);
+els.optSpeak.addEventListener('change', () => {
+  savePrefs();
+  if (!els.optSpeak.checked && 'speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
+});
+window.addEventListener('pagehide', stopStream);
+
+renderPicture();
+renderSound();
+})();
+</script>
+</body>
+</html>
