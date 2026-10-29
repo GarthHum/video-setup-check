@@ -735,8 +735,12 @@ function pickFace(faces) {
   const f = faces.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
   let tilt = NaN;
   if (f.eyes) {
-    const dx = (f.eyes.l.x - f.eyes.r.x) * els.video.videoWidth;
-    const dy = (f.eyes.l.y - f.eyes.r.y) * els.video.videoHeight;
+    /* Order the eyes by position in the raw image so the sign never depends on the detector's labels.
+       Positive tilt: the eye on the right of the raw image is lower, which is your own left side. */
+    const a = f.eyes.l.x < f.eyes.r.x ? f.eyes.l : f.eyes.r;
+    const b = a === f.eyes.l ? f.eyes.r : f.eyes.l;
+    const dx = (b.x - a.x) * els.video.videoWidth;
+    const dy = (b.y - a.y) * els.video.videoHeight;
     tilt = Math.atan2(dy, dx) * 180 / Math.PI;
     if (tilt > 90) tilt -= 180;
     if (tilt < -90) tilt += 180;
@@ -1160,7 +1164,11 @@ function evaluatePicture() {
     } else push('facing', 'good', 'You are facing the camera.', 2.5);
 
     if (!Number.isFinite(f.tilt)) push('tilt', 'unknown', 'Tilt cannot be measured with this face detector.', 99);
-    else if (Math.abs(f.tilt) > CFG.tiltMaxDeg) push('tilt', 'adjust', 'Your head or the camera is tilted by about ' + Math.round(Math.abs(f.tilt)) + ' degrees. Level the camera or straighten your head.', 5, 'tilt');
+    else if (Math.abs(f.tilt) > CFG.tiltMaxDeg) {
+      const low = f.tilt > 0 ? 'left' : 'right';      /* the side your head is leaning toward */
+      const fix = f.tilt > 0 ? 'right' : 'left';
+      push('tilt', 'adjust', 'Your head is tilted about ' + Math.round(Math.abs(f.tilt)) + ' degrees toward your ' + low + ' shoulder. Tilt your head a little toward your ' + fix + ' shoulder, or level the camera.', 5, 'tilt:' + low);
+    }
     else push('tilt', 'good', 'Your head and the camera look level.', 5);
   }
 
