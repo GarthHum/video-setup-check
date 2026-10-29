@@ -191,7 +191,7 @@
 <div class="wrap">
   <header>
     <h1>Video Setup Check</h1>
-    <p class="lede">Check your framing, lighting and microphone before you record or join a call. Everything runs in your browser. Nothing is recorded or uploaded. The Help section explains exactly what happens to your video and audio.</p>
+    <p class="lede">Check your framing, lighting and microphone before you record or join a call. Everything runs in your browser. Nothing is saved or uploaded. The Help section explains exactly what happens to your video and audio.</p>
   </header>
 
   <main id="main" style="display:grid; gap:1rem;">
@@ -241,12 +241,16 @@
       <h2 id="sound-h">Sound</h2>
       <div class="sound-grid">
         <div>
-          <div class="meter-label"><span>Microphone level now</span><span id="meterValue" class="num">Off</span></div>
+          <div class="meter-label"><span>Microphone peak level now</span><span id="meterValue" class="num">Off</span></div>
           <div class="meter" id="meter" aria-hidden="true"><div class="meter-cover" id="meterCover"></div></div>
           <div class="zones" id="zones" aria-hidden="true"><span id="zoneLow">Too quiet</span><span id="zoneGood">Good</span><span id="zoneHot">Too loud</span></div>
-          <p>The voice test stays silent for two seconds to measure room noise, plays a beep, then listens to you speak for six seconds.</p>
-          <button type="button" id="voiceBtn" class="btn" disabled>Test my voice</button>
-          <p id="voiceStatus" class="small" style="margin-top:.75rem"></p>
+          <p>Press Test my voice. After a moment you will hear a low beep. Stay silent until you hear a high beep, which takes about two seconds. Then speak normally for six seconds, until you hear two short beeps. Your voice then plays back so you can hear what the microphone caught, and the results appear below.</p>
+          <div class="control-row">
+            <button type="button" id="voiceBtn" class="btn" disabled>Test my voice</button>
+            <button type="button" id="playBtn" class="btn secondary" disabled>Play back my voice</button>
+          </div>
+          <p id="voiceStatus" class="small"></p>
+          <p id="voiceResult" tabindex="-1"></p>
         </div>
         <ul class="checks" id="soundList"></ul>
       </div>
@@ -261,8 +265,8 @@
       <h2 id="help-h">Help</h2>
       <details>
         <summary>What happens to my video and audio?</summary>
-        <p>Your video and audio are not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The microphone is used only to measure how loud you are. The sound itself is not kept.</p>
-        <p>Nothing is recorded or saved. Everything exists only in your browser's memory while the camera is on. Choosing Stop camera and microphone, closing the tab, or leaving the page turns the camera and microphone off and clears it all.</p>
+        <p>Your video and audio are not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The microphone is used to measure how loud you are. During the voice test only, the six seconds of your voice are also held in your browser's memory so the page can play them back to you. That sound stays on your computer, and it is discarded when you run the test again, stop the camera and microphone, or leave the page.</p>
+        <p>Nothing is saved to your computer. Everything exists only in your browser's memory while the page is open. Choosing Stop camera and microphone, closing the tab, or leaving the page turns the camera and microphone off and clears it all.</p>
         <p>This page saves nothing on your computer: no video, audio, results or settings. It sets no cookies, has no accounts and has no analytics.</p>
         <p>Some things are downloaded to your browser. The first time the face detector runs, your browser downloads its program code from the jsDelivr code delivery service and its small face model file from Google's servers. These are downloads to your computer and do not include your video. As with any website, the servers that provide the page and those files can see ordinary visit details such as your internet address and browser type. The page itself is hosted on GitHub Pages.</p>
         <p>Voice feedback uses the speech built into your browser. The words spoken are short advice messages made by this page, never your video or audio. Some browsers use online voices, and if yours does, the spoken words may be sent to the voice provider.</p>
@@ -278,12 +282,12 @@
       <details>
         <summary>How the checks work</summary>
         <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
-        <p>The voice test turns off echo cancellation, noise suppression and automatic gain, so the numbers reflect what your microphone really records. Levels are in decibels relative to full scale. Around minus 20 is a healthy speaking level, and zero is the point where the sound distorts.</p>
+        <p>The microphone meter and voice test turn off echo cancellation, noise suppression and automatic gain, so the numbers reflect what a recording app would capture. Video call apps often boost a quiet microphone automatically, so this page can read lower than they do. Levels are peak levels in decibels relative to full scale, like the meters in recording software. Zero is the point where the sound distorts, and healthy speech peaks around minus 12. Your average level reads lower than the peaks, usually by 10 decibels or more.</p>
         <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
       </details>
       <details>
         <summary>Voice feedback</summary>
-        <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop things you ask for, such as Describe my setup and the voice test instructions.</p>
+        <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop what you ask for with the Describe my setup button.</p>
         <p>The voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing after pressing Start, check that your computer volume is up.</p>
       </details>
       <details>
@@ -322,7 +326,7 @@ const CFG = {
   backlitMinBg: 110,
   sideGap: 30,
   minHeightPx: 720,
-  mic: { veryQuiet: -45, quiet: -34, loud: -9, clipPeak: 0.98, clipFrames: 3, floor: -70 },
+  mic: { veryQuiet: -36, quiet: -24, loud: -3, clipPeak: 0.98, clipFrames: 3, floor: -70 },
   noise: { quiet: -62, some: -50, minGap: 25 },
   voice: { quietSec: 2, speakSec: 6 },
 };
@@ -335,7 +339,7 @@ const els = {
   pictureList: $('pictureList'), soundList: $('soundList'),
   meter: $('meter'), meterCover: $('meterCover'), meterValue: $('meterValue'),
   zoneLow: $('zoneLow'), zoneGood: $('zoneGood'), zoneHot: $('zoneHot'),
-  voiceBtn: $('voiceBtn'), voiceStatus: $('voiceStatus'),
+  voiceBtn: $('voiceBtn'), playBtn: $('playBtn'), voiceStatus: $('voiceStatus'), voiceResult: $('voiceResult'),
   reportPanel: $('reportPanel'), report: $('report'),
   pause: $('pauseBtn'),
 };
@@ -359,7 +363,7 @@ const S = {
   timers: { detect: null, audio: null, evaluate: null },
   busy: false, samples: [], lastFace: null, faceOk: false,
   mic: { shown: -100, ticks: 0 },
-  voice: null, testing: false, testBuf: null,
+  voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, at: 0 },
   paused: false, utter: null,
 };
@@ -403,7 +407,7 @@ function speak(text, interrupt) {
 function say(text, opts) {
   if (!text) return Promise.resolve();
   const o = opts || {};
-  if (o.auto && S.paused) return Promise.resolve();
+  if (o.auto && (S.paused || S.testing)) return Promise.resolve();
   return speak(text, !o.queue);
 }
 
@@ -634,6 +638,7 @@ function stopStream() {
   S.audioCtx = null; S.analyser = null; S.srcNode = null; S.buf = null;
   S.lastFace = null; S.samples = [];
   S.mic.shown = -100;
+  S.proc = null; S.rec = null; S.clip = null;
   els.video.srcObject = null;
 }
 
@@ -650,6 +655,8 @@ function resetUi() {
   els.describe.disabled = true;
   els.voiceBtn.disabled = true;
   els.voiceStatus.textContent = '';
+  els.voiceResult.textContent = '';
+  els.playBtn.disabled = true;
   els.stageInner.hidden = true;
   els.placeholder.hidden = false;
   els.placeholder.textContent = 'The camera preview appears here after you press Start.';
@@ -845,6 +852,13 @@ function setupAudio(track) {
   S.analyser.smoothingTimeConstant = 0;
   S.srcNode.connect(S.analyser);
   S.buf = new Float32Array(S.analyser.fftSize);
+  /* Raw samples are kept in memory only while the voice test is listening to your speech. */
+  if (S.audioCtx.createScriptProcessor) {
+    S.proc = S.audioCtx.createScriptProcessor(4096, 1, 1);
+    S.proc.onaudioprocess = (e) => { if (S.rec) S.rec.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    S.srcNode.connect(S.proc);
+    S.proc.connect(S.audioCtx.destination);
+  }
   S.mic.shown = -100; S.mic.ticks = 0;
   S.timers.audio = setInterval(audioTick, 50);
 }
@@ -861,8 +875,9 @@ function audioTick() {
   }
   const rms = Math.sqrt(sum / S.buf.length);
   const db = rms > 0 ? 20 * Math.log10(rms) : -100;
-  if (S.testBuf) S.testBuf.push({ db, peak });
-  S.mic.shown = db > S.mic.shown ? db : S.mic.shown - 1.5;
+  const pdb = peak > 0 ? 20 * Math.log10(peak) : -100;
+  if (S.testBuf) S.testBuf.push({ db, peak, pdb });
+  S.mic.shown = pdb > S.mic.shown ? pdb : S.mic.shown - 1.5;
   const p = clamp((S.mic.shown - CFG.mic.floor) / -CFG.mic.floor, 0, 1);
   els.meterCover.style.left = (p * 100).toFixed(1) + '%';
   if (++S.mic.ticks % 10 === 0) {
@@ -904,39 +919,92 @@ async function countdown(sec, label) {
   }
 }
 
+function discardClip() {
+  S.rec = null; S.clip = null;
+  els.playBtn.disabled = true;
+}
+
+function playClip() {
+  if (!S.clip || !S.audioCtx || S.playing) return Promise.resolve();
+  S.playing = true;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; S.playing = false; resolve(); };
+    try {
+      const c = S.clip;
+      if (S.audioCtx.state === 'suspended') S.audioCtx.resume().catch(() => {});
+      const buf = S.audioCtx.createBuffer(1, c.data.length, c.rate);
+      buf.getChannelData(0).set(c.data);
+      const src = S.audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(S.audioCtx.destination);
+      src.onended = finish;
+      src.start();
+      setTimeout(finish, (c.data.length / c.rate) * 1000 + 1500);
+    } catch (e) { finish(); }
+  });
+}
+
 async function runVoiceTest() {
   if (!S.analyser || S.testing) return;
   const T = CFG.voice;
   S.testing = true;
-  els.voiceBtn.disabled = true;
+  /* The button stays enabled so keyboard focus is not lost; clicks are ignored while testing. */
+  els.voiceBtn.setAttribute('aria-disabled', 'true');
+  els.voiceBtn.textContent = 'Testing, listen for the beeps';
+  els.voiceResult.textContent = '';
+  discardClip();
   S.voice = null;
   renderSound();
   try {
-    els.voiceStatus.textContent = 'Get ready…';
-    await say('Voice test. First stay silent for ' + T.quietSec + ' seconds. After the beep, speak normally for ' + T.speakSec + ' seconds. A lower beep marks the end.');
-    await sleep(500);
+    if (S.audioCtx && S.audioCtx.state === 'suspended') { try { await S.audioCtx.resume(); } catch (e) { /* ignore */ } }
+    els.voiceStatus.textContent = 'Get ready. A low beep is coming, then stay silent.';
+    await sleep(600);
+    beep(520, 0.2);
+    await sleep(900);
     if (!S.analyser) return;
     S.testBuf = [];
     await countdown(T.quietSec, 'Stay silent');
     const quiet = S.testBuf || [];
     if (!S.analyser) return;
-    beep(880, 0.18);
+    beep(880, 0.2);
     await sleep(500);
     S.testBuf = [];
+    S.rec = S.proc ? [] : null;
     await countdown(T.speakSec, 'Speak now');
     const speech = S.testBuf || [];
-    S.testBuf = null;
+    const chunks = S.rec;
+    S.testBuf = null; S.rec = null;
     if (!S.analyser) return;
     beep(520, 0.15);
     beep(520, 0.15, 0.22);
-    els.voiceStatus.textContent = 'Test finished.';
+    els.voiceStatus.textContent = 'Finished listening.';
     S.voice = analyseVoice(quiet, speech);
+    if (chunks && chunks.length) {
+      let n = 0; for (const c of chunks) n += c.length;
+      const data = new Float32Array(n);
+      let o = 0; for (const c of chunks) { data.set(c, o); o += c.length; }
+      S.clip = { data, rate: S.audioCtx.sampleRate };
+      els.playBtn.disabled = false;
+    }
     renderSound();
     const rows = evaluateSound();
-    say('Voice test finished. ' + rows.map((r) => r.text).join(' '));
+    els.voiceResult.textContent = 'Voice test results. ' + rows.map((r) => r.text).join(' ');
+    if (S.clip) {
+      await sleep(900);
+      if (!S.analyser) return;
+      els.voiceStatus.textContent = 'Playing back what the microphone heard…';
+      await playClip();
+      els.voiceStatus.textContent = 'Playback finished. Use Play back my voice to hear it again.';
+    } else {
+      els.voiceStatus.textContent = 'Test finished.';
+    }
+    els.voiceResult.focus();
   } finally {
-    S.testBuf = null;
+    S.testBuf = null; S.rec = null;
     S.testing = false;
+    els.voiceBtn.removeAttribute('aria-disabled');
+    els.voiceBtn.textContent = 'Test my voice';
     els.voiceBtn.disabled = !S.analyser;
   }
 }
@@ -945,12 +1013,14 @@ function analyseVoice(quiet, speech) {
   if (quiet.length < 10 || speech.length < 20) return null;
   const q = quiet.map((f) => f.db).sort((a, b) => a - b);
   const s = speech.map((f) => f.db).sort((a, b) => a - b);
+  const sp = speech.map((f) => f.pdb).sort((a, b) => a - b);
   const noise = pct(q, 0.5);
-  const level = pct(s, 0.9);
+  const level = pct(s, 0.9);        /* average loudness (RMS), compared against room noise */
+  const peakLevel = pct(sp, 0.9);   /* typical peak, like a recording meter */
   const peak = Math.max(...speech.map((f) => f.peak));
   const clips = speech.filter((f) => f.peak >= CFG.mic.clipPeak).length;
   const heard = (level - noise) >= 10 && level > -65;
-  return { noise, level, peak, clips, heard };
+  return { noise, level, peakLevel, peak, clips, heard };
 }
 
 /* ---------- Evaluation: sound ---------- */
@@ -974,11 +1044,11 @@ function evaluateSound() {
     push('clip', 'unknown', 'Needs a successful voice test.');
     return out;
   }
-  const lv = fmtDb(v.level);
-  if (v.level < M.veryQuiet) push('voice', 'adjust', 'Your voice is very quiet, about ' + lv + '. Raise the microphone input volume, move closer to the microphone, or choose another microphone. On a Mac, use System Settings, Sound, Input. On Windows, use Settings, System, Sound, Input.');
-  else if (v.level < M.quiet) push('voice', 'adjust', 'Your voice is a little quiet, about ' + lv + '. Move closer to the microphone or raise its input volume.');
-  else if (v.level > M.loud) push('voice', 'adjust', 'Your voice is very loud, about ' + lv + '. Lower the input volume or move back from the microphone.');
-  else push('voice', 'good', 'Your voice level is good, about ' + lv + '.');
+  const lv = fmtDb(v.peakLevel);
+  if (v.peakLevel < M.veryQuiet) push('voice', 'adjust', 'Your voice peaks at only about ' + lv + ', which is very quiet. A healthy level is around minus 12. Raise the microphone input volume, move closer to the microphone, or choose another microphone. On a Mac, use System Settings, Sound, Input. On Windows, use Settings, System, Sound, Input.');
+  else if (v.peakLevel < M.quiet) push('voice', 'adjust', 'Your voice peaks at about ' + lv + ', which is a little quiet. A healthy level is around minus 12. Move closer to the microphone or raise its input volume.');
+  else if (v.peakLevel > M.loud) push('voice', 'adjust', 'Your voice peaks at about ' + lv + ', which is very loud. Lower the input volume or move back from the microphone.');
+  else push('voice', 'good', 'Your voice level is good. It peaks at about ' + lv + '.');
 
   const nz = fmtDb(v.noise);
   const gap = Math.round(v.level - v.noise);
@@ -1184,7 +1254,8 @@ els.pause.addEventListener('click', () => {
   els.pause.textContent = S.paused ? 'Resume voice feedback' : 'Pause voice feedback';
   say(S.paused ? 'Voice feedback paused. Choose the button again to resume.' : 'Voice feedback resumed.');
 });
-els.voiceBtn.addEventListener('click', () => { unlockSpeech(); runVoiceTest(); });
+els.voiceBtn.addEventListener('click', () => { runVoiceTest(); });
+els.playBtn.addEventListener('click', () => { if (S.testing) return; els.voiceStatus.textContent = 'Playing back…'; playClip().then(() => { els.voiceStatus.textContent = 'Playback finished.'; }); });
 els.camSel.addEventListener('change', () => { if (S.stream) start(); });
 els.micSel.addEventListener('change', () => { if (S.stream) start(); });
 window.addEventListener('pagehide', () => {
