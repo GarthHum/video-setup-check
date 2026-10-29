@@ -152,6 +152,12 @@
     padding: 1rem; margin: 0; color: #cfe0de;
   }
   .stage-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: .75rem; }
+  .announce { margin: 0 0 .75rem; }
+  .announce-h { font-size: .95rem; margin: 0 0 .3rem; }
+  .announce-log { border: 1px solid var(--line); border-radius: .5rem; padding: .5rem .75rem; min-height: 3rem; font-size: .95rem; }
+  .announce-log p { margin: 0 0 .4rem; }
+  .announce-log p:last-child { margin-bottom: 0; }
+  .announce-log:empty::before { content: "No announcements yet."; color: var(--muted); }
 
   .checks { list-style: none; margin: 0; padding: 0; }
   .check { padding: .75rem 0; border-top: 1px solid var(--line); }
@@ -218,6 +224,7 @@
       <fieldset class="opts">
         <legend>Options</legend>
         <label><input type="checkbox" id="optAnnounce" checked> Announce changes as I adjust</label>
+        <label><input type="checkbox" id="optInterrupt"> Interrupt my screen reader with announcements (try this if you hear nothing with VoiceOver)</label>
         <label><input type="checkbox" id="optSpeak"> Speak announcements with the browser voice (leave this off if you use a screen reader)</label>
         <label><input type="checkbox" id="optMirror" checked> Mirror the preview. This does not change what is recorded.</label>
         <label><input type="checkbox" id="optGuides" checked> Show framing guides on the preview</label>
@@ -230,6 +237,11 @@
         <p id="coach" class="coach">Press Start to begin.</p>
         <div class="stage-actions">
           <button type="button" id="describeBtn" class="btn secondary" disabled>Describe my setup</button>
+          <button type="button" id="testAnnounceBtn" class="btn secondary">Test announcement</button>
+        </div>
+        <div class="announce">
+          <h3 id="announce-h" class="announce-h">Announcements</h3>
+          <div id="announceLog" class="announce-log" role="log" aria-live="polite" aria-labelledby="announce-h"></div>
         </div>
         <div class="stage" id="stage">
           <div class="stage-inner mirror" id="stageInner" hidden>
@@ -290,8 +302,6 @@
   </main>
 </div>
 
-<div id="live" class="vh" role="status" aria-live="polite" aria-atomic="true"></div>
-
 <script>
 (() => {
 'use strict';
@@ -335,7 +345,8 @@ const els = {
   meter: $('meter'), meterCover: $('meterCover'), meterValue: $('meterValue'),
   zoneLow: $('zoneLow'), zoneGood: $('zoneGood'), zoneHot: $('zoneHot'),
   voiceBtn: $('voiceBtn'), voiceStatus: $('voiceStatus'),
-  reportPanel: $('reportPanel'), report: $('report'), live: $('live'),
+  reportPanel: $('reportPanel'), report: $('report'),
+  log: $('announceLog'), testAnnounce: $('testAnnounceBtn'), optInterrupt: $('optInterrupt'),
 };
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -355,7 +366,7 @@ function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY) ||
 function savePrefs() {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({
-      announce: els.optAnnounce.checked, speak: els.optSpeak.checked,
+      announce: els.optAnnounce.checked, speak: els.optSpeak.checked, interrupt: els.optInterrupt.checked,
       mirror: els.optMirror.checked, guides: els.optGuides.checked,
     }));
   } catch (e) { /* storage unavailable, ignore */ }
@@ -366,7 +377,9 @@ function savePrefs() {
   if (p.speak === true) els.optSpeak.checked = true;
   if (p.mirror === false) els.optMirror.checked = false;
   if (p.guides === false) els.optGuides.checked = false;
+  if (p.interrupt === true) els.optInterrupt.checked = true;
   els.stageInner.classList.toggle('mirror', els.optMirror.checked);
+  applyLiveMode();
 })();
 
 /* ---------- State ---------- */
@@ -382,9 +395,21 @@ const S = {
 };
 
 /* ---------- Announcements ---------- */
-function toLive(text) {
-  els.live.textContent = '';
-  setTimeout(() => { els.live.textContent = text; }, 60);
+/* Messages are added as new paragraphs to a visible log (role="log"). Adding a new element is the
+   live-region pattern screen readers handle most reliably. The short delay lets VoiceOver finish
+   speaking a button or focus change before the message arrives. */
+const LOG_MAX = 5;
+const LOG_DELAY_MS = 450;
+function applyLiveMode() {
+  els.log.setAttribute('aria-live', els.optInterrupt.checked ? 'assertive' : 'polite');
+}
+function toLog(text) {
+  setTimeout(() => {
+    const p = document.createElement('p');
+    p.textContent = text;
+    els.log.appendChild(p);
+    while (els.log.children.length > LOG_MAX) els.log.removeChild(els.log.firstElementChild);
+  }, LOG_DELAY_MS);
 }
 function say(text) {
   if (!text) return;
@@ -393,9 +418,9 @@ function say(text) {
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
       return;
-    } catch (e) { /* fall through to the live region */ }
+    } catch (e) { /* fall through to the log */ }
   }
-  toLive(text);
+  toLog(text);
 }
 
 /* ---------- Rows ---------- */
@@ -601,7 +626,11 @@ async function attach({ stream, kind, err }) {
   }
   evaluateAndRender();
   renderSound();
-  say('Camera and microphone are on. Move into view and I will tell you how to adjust.');
+  say(!S.videoTrack
+    ? 'Microphone is on. Use Test my voice to check your sound.'
+    : S.detectorState === 'ready'
+      ? 'Camera and microphone are on. Move into view and I will tell you how to adjust.'
+      : 'Camera and microphone are on. Loading the face detector.');
 }
 
 function onTrackEnded() {
@@ -674,6 +703,11 @@ function loadDetector() {
       }
     }
     S.detectorState = S.detector ? 'ready' : 'unavailable';
+    if (S.stream) {
+      say(S.detector
+        ? 'Face detector ready. Move into view and I will tell you how to adjust.'
+        : 'The face detector could not load, so framing advice is unavailable. Lighting and sound checks still work.');
+    }
     evaluateAndRender();
   })();
   return S.detectorLoading;
@@ -1160,6 +1194,10 @@ function describeSetup() {
 /* ---------- Wiring ---------- */
 els.start.addEventListener('click', () => { if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', describeSetup);
+els.testAnnounce.addEventListener('click', () => {
+  say('This is a test announcement. If you can hear this, automatic announcements are working. If you heard nothing, turn on the option to interrupt your screen reader, in Options.');
+});
+els.optInterrupt.addEventListener('change', () => { applyLiveMode(); savePrefs(); });
 els.voiceBtn.addEventListener('click', runVoiceTest);
 els.camSel.addEventListener('change', () => { if (S.stream) start(); });
 els.micSel.addEventListener('change', () => { if (S.stream) start(); });
