@@ -198,8 +198,11 @@
     <section class="panel" aria-labelledby="controls-h">
       <h2 id="controls-h">Camera and microphone</h2>
       <div class="control-row">
-        <button type="button" id="startBtn" class="btn">Start camera and microphone</button>
+        <button type="button" id="startBtn" class="btn" aria-keyshortcuts="S">Start camera and microphone</button>
+        <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="M">Pause voice feedback</button>
+        <button type="button" id="describeBtn" class="btn secondary" aria-keyshortcuts="D" disabled>Describe my setup</button>
       </div>
+      <p class="small" id="keysHint">Shortcut keys: S start or stop, M mute or unmute the voice, D describe my setup, N hear the current advice now, V voice test. Details are in Help.</p>
       <div id="errorBox" class="notice" role="alert" hidden></div>
       <div class="selects">
         <div class="field">
@@ -217,10 +220,6 @@
       <section class="panel" aria-labelledby="preview-h">
         <h2 id="preview-h">Preview</h2>
         <p id="coach" class="coach">Press Start to begin.</p>
-        <div class="stage-actions">
-          <button type="button" id="describeBtn" class="btn secondary" disabled>Describe my setup</button>
-          <button type="button" id="pauseBtn" class="btn secondary">Pause voice feedback</button>
-        </div>
         <div class="stage" id="stage">
           <div class="stage-inner mirror" id="stageInner" hidden>
             <video id="video" autoplay muted playsinline aria-label="Live camera preview. Results are listed in the sections beside and below."></video>
@@ -287,8 +286,20 @@
       </details>
       <details>
         <summary>Voice feedback</summary>
-        <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop what you ask for with the Describe my setup button.</p>
+        <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop what you ask for with the Describe my setup button or the N key, so you can mute the voice and still ask for advice on demand.</p>
         <p>The voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing after pressing Start, check that your computer volume is up.</p>
+      </details>
+      <details>
+        <summary>Shortcut keys</summary>
+        <p>These keys work anywhere on the page, except while a Camera or Microphone list has focus.</p>
+        <ul>
+          <li>S starts or stops the camera and microphone.</li>
+          <li>M mutes or unmutes the automatic voice advice. While muted, nothing is spoken unless you ask.</li>
+          <li>N speaks the current advice now, even while muted. This is the on demand option: mute with M, then press N whenever you want to hear what to adjust.</li>
+          <li>D describes your whole setup, picture and sound.</li>
+          <li>V runs the voice test.</li>
+        </ul>
+        <p>Screen readers can capture plain letter keys. VoiceOver on a Mac passes them through unless Quick Nav is on. NVDA and JAWS in browse mode usually keep them for their own navigation, so switch to focus mode, or use the second set: hold Alt and Shift together and press the same letter, for example Alt plus Shift plus M. On a Mac that is Option plus Shift plus M. The buttons at the top of the page always work too, and they sit right after the Start button.</p>
       </details>
       <details>
         <summary>Supported browsers</summary>
@@ -1275,14 +1286,41 @@ function describeSetup() {
 /* ---------- Wiring ---------- */
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
-els.pause.addEventListener('click', () => {
+function toggleMute() {
   unlockSpeech();
   S.paused = !S.paused;
   els.pause.textContent = S.paused ? 'Resume voice feedback' : 'Pause voice feedback';
-  say(S.paused ? 'Voice feedback paused. Choose the button again to resume.' : 'Voice feedback resumed.');
-});
+  say(S.paused ? 'Voice feedback muted. Press M to unmute, or N to hear the advice when you want it.' : 'Voice feedback resumed.');
+}
+function adviceNow() {
+  unlockSpeech();
+  if (!S.stream) { say('Press S to start the camera and microphone.'); return; }
+  S.announce.at = Date.now();
+  say(els.coach.textContent);
+}
+els.pause.addEventListener('click', toggleMute);
 els.voiceBtn.addEventListener('click', () => { runVoiceTest(); });
 els.playBtn.addEventListener('click', () => { if (S.testing) return; els.voiceStatus.textContent = 'Playing back…'; playClip().then(() => { els.voiceStatus.textContent = 'Playback finished.'; }); });
+/* Shortcut keys: plain letters, or Alt+Shift+letter for screen readers that keep plain letters.
+   e.code is used so the keys do not change with the keyboard layout or the Option key on a Mac. */
+document.addEventListener('keydown', (e) => {
+  if (e.repeat || e.isComposing || e.ctrlKey || e.metaKey) return;
+  const combo = e.altKey && e.shiftKey;
+  const plain = !e.altKey && !e.shiftKey;
+  if (!combo && !plain) return;
+  const t = e.target;
+  const tag = t && t.tagName;
+  if (plain && (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable))) return;
+  const busy = () => { if (S.testing) { els.voiceStatus.textContent = 'Please wait until the voice test finishes.'; return true; } return false; };
+  switch (e.code) {
+    case 'KeyS': e.preventDefault(); unlockSpeech(); if (S.stream) stop(); else start(); break;
+    case 'KeyM': e.preventDefault(); toggleMute(); break;
+    case 'KeyN': e.preventDefault(); if (!busy()) adviceNow(); break;
+    case 'KeyD': e.preventDefault(); if (!busy()) { unlockSpeech(); describeSetup(); } break;
+    case 'KeyV': e.preventDefault(); if (S.analyser) runVoiceTest(); else { unlockSpeech(); say('Press S to start the microphone first.'); } break;
+    default: break;
+  }
+});
 els.camSel.addEventListener('change', () => { if (S.stream) start(); });
 els.micSel.addEventListener('change', () => { if (S.stream) start(); });
 window.addEventListener('pagehide', () => {
