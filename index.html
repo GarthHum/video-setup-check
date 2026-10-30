@@ -199,10 +199,12 @@
       <h2 id="controls-h">Camera and microphone</h2>
       <div class="control-row">
         <button type="button" id="startBtn" class="btn" aria-keyshortcuts="S">Start camera and microphone</button>
-        <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="M">Pause voice feedback</button>
+        <button type="button" id="checkBtn" class="btn secondary" aria-keyshortcuts="C" disabled>Check my picture now</button>
+        <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="L">Start live voice feedback</button>
         <button type="button" id="describeBtn" class="btn secondary" aria-keyshortcuts="D" disabled>Describe my setup</button>
       </div>
-      <p class="small" id="keysHint">Shortcut keys: S start or stop, M mute or unmute the voice, D describe my setup, N hear the current advice now, V voice test. Details are in Help.</p>
+      <p id="checkResult" tabindex="-1"></p>
+      <p class="small" id="keysHint">Shortcut keys: S start or stop, C check my picture now, L live voice feedback on or off, D describe my setup, V voice test. Details are in Help.</p>
       <div id="errorBox" class="notice" role="alert" hidden></div>
       <div class="selects">
         <div class="field">
@@ -286,21 +288,21 @@
       </details>
       <details>
         <summary>Voice feedback</summary>
-        <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop what you ask for with the Describe my setup button or the N key, so you can mute the voice and still ask for advice on demand.</p>
-        <p>On an iPhone or iPad the advice is read by VoiceOver instead of the browser voice, because Safari on iOS silences the browser voice while the microphone is open. Turn VoiceOver on to hear it. Pause voice feedback still mutes the automatic advice.</p>
-        <p>On a computer the voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing after pressing Start, check that your computer volume is up.</p>
+        <p>There are two ways to get advice on your picture. Press Check my picture now, or the C key, and the advice appears as text just below the buttons, with your screen reader moved onto it so it reads it out. Nothing is spoken by the page for this. Or press Start live voice feedback, or the L key, and the page speaks each adjustment as you move, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Stop live voice feedback turns it off again. Live voice feedback is off until you turn it on.</p>
+        <p>Describe my setup works the same way as Check my picture now: the whole summary of picture and sound appears as text and your screen reader is moved onto it. The voice test works like this too.</p>
+        <p>On an iPhone or iPad, live voice feedback is read by VoiceOver instead of the browser voice, because Safari on iOS silences the browser voice while the microphone is open. Turn VoiceOver on to hear it. On a computer the live voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your volume is up.</p>
       </details>
       <details>
         <summary>Shortcut keys</summary>
         <p>These keys work anywhere on the page, except while a Camera or Microphone list has focus.</p>
         <ul>
           <li>S starts or stops the camera and microphone.</li>
-          <li>M mutes or unmutes the automatic voice advice. While muted, nothing is spoken unless you ask.</li>
-          <li>N speaks the current advice now, even while muted. This is the on demand option: mute with M, then press N whenever you want to hear what to adjust.</li>
-          <li>D describes your whole setup, picture and sound.</li>
+          <li>C checks your picture now. The advice appears as text and your screen reader is moved onto it. N does the same.</li>
+          <li>L turns live voice feedback on or off. M does the same.</li>
+          <li>D describes your whole setup, picture and sound, as text.</li>
           <li>V runs the voice test.</li>
         </ul>
-        <p>Screen readers can capture plain letter keys. VoiceOver on a Mac passes them through unless Quick Nav is on. NVDA and JAWS in browse mode usually keep them for their own navigation, so switch to focus mode, or use the second set: hold Alt and Shift together and press the same letter, for example Alt plus Shift plus M. On a Mac that is Option plus Shift plus M. The buttons at the top of the page always work too, and they sit right after the Start button.</p>
+        <p>Screen readers can capture plain letter keys. VoiceOver on a Mac passes them through unless Quick Nav is on. NVDA and JAWS in browse mode usually keep them for their own navigation, so switch to focus mode, or use the second set: hold Alt and Shift together and press the same letter, for example Alt plus Shift plus C. On a Mac that is Option plus Shift plus C. The buttons at the top of the page always work too, and they sit right after the Start button. Phones and tablets have no keyboard shortcuts, so use the buttons.</p>
       </details>
       <details>
         <summary>Supported browsers</summary>
@@ -354,7 +356,7 @@ const els = {
   zoneLow: $('zoneLow'), zoneGood: $('zoneGood'), zoneHot: $('zoneHot'),
   voiceBtn: $('voiceBtn'), playBtn: $('playBtn'), voiceStatus: $('voiceStatus'), voiceResult: $('voiceResult'),
   reportPanel: $('reportPanel'), report: $('report'),
-  pause: $('pauseBtn'),
+  pause: $('pauseBtn'), checkBtn: $('checkBtn'), checkResult: $('checkResult'),
 };
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -378,7 +380,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, at: 0 },
-  paused: false, utter: null,
+  paused: true, utter: null,
 };
 
 /* ---------- Announcements ---------- */
@@ -640,6 +642,7 @@ async function attach({ stream, kind, err }) {
 
   els.start.textContent = 'Stop camera and microphone';
   els.describe.disabled = false;
+  els.checkBtn.disabled = !S.videoTrack;
   els.voiceBtn.disabled = !S.analyser;
   S.timers.evaluate = setInterval(evaluateAndRender, CFG.evaluateEveryMs);
   if (S.videoTrack) {
@@ -650,9 +653,7 @@ async function attach({ stream, kind, err }) {
   renderSound();
   say(!S.videoTrack
     ? 'Microphone is on. Use Test my voice to check your sound.'
-    : S.detectorState === 'ready'
-      ? 'Camera and microphone are on. Move into view and I will tell you how to adjust.'
-      : 'Camera and microphone are on. Loading the face detector.');
+    : 'Camera and microphone are on. Press Check my picture now for advice, or Start live voice feedback to hear advice as you move.');
 }
 
 function onTrackEnded() {
@@ -664,8 +665,19 @@ function stopStream() {
   clearInterval(S.timers.detect);
   clearInterval(S.timers.audio);
   clearInterval(S.timers.evaluate);
+  try {
+    if (S.proc) { S.proc.onaudioprocess = null; S.proc.disconnect(); }
+    if (S.srcNode) S.srcNode.disconnect();
+    if (S.analyser) S.analyser.disconnect();
+  } catch (e) { /* ignore */ }
   if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
   if (S.audioCtx) { try { S.audioCtx.close(); } catch (e) { /* ignore */ } }
+  /* On iPhone, Safari can leave the audio session in recording mode after the microphone stops, which
+     silences VoiceOver until Safari is left. Asking for the default session type releases it. */
+  const resetSession = () => { try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) { /* ignore */ } };
+  resetSession();
+  setTimeout(resetSession, 300);
+  try { els.video.pause(); } catch (e) { /* ignore */ }
   if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) {
     navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
   }
@@ -688,6 +700,8 @@ function resetUi() {
   els.start.textContent = 'Start camera and microphone';
   els.start.disabled = false;
   els.describe.disabled = true;
+  els.checkBtn.disabled = true;
+  els.checkResult.textContent = '';
   els.voiceBtn.disabled = true;
   els.voiceStatus.textContent = '';
   els.voiceResult.textContent = '';
@@ -1298,30 +1312,48 @@ function buildReport() {
 function rowName(id) { const d = PICTURE_ROWS.find((r) => r[0] === id); return d ? d[1] : id; }
 
 function describeSetup() {
-  if (!S.stream) { say('Start the camera first.'); return; }
+  if (!S.stream) { showCheck('The camera and microphone are not running. Press Start first.'); return; }
   const [p1, p2] = buildReport();
-  els.report.replaceChildren(p1, p2);
+  const p = document.createElement('p');
+  p.tabIndex = -1;
+  p.append(p1.textContent, document.createElement('br'), p2.textContent);
+  els.report.replaceChildren(p);
   els.reportPanel.hidden = false;
   S.announce.at = Date.now() + 6000;
-  say(p1.textContent + ' ' + p2.textContent);
+  p.focus();
+}
+
+/* Shows a result as text and moves focus onto it, so a screen reader reads it. Nothing is spoken by the page. */
+function showCheck(text) {
+  els.checkResult.textContent = text;
+  els.checkResult.focus();
+}
+function checkNow() {
+  if (!S.stream) { showCheck('The camera is not running. Press Start first.'); return; }
+  if (!S.videoTrack) { showCheck('No camera is running. Use Describe my setup for the microphone, or Test my voice.'); return; }
+  const rows = evaluatePicture();
+  const adjust = rows.filter((r) => r.state === 'adjust' && r.id !== 'camera').sort((a, b) => a.pri - b.pri);
+  const f = currentFace();
+  let text;
+  if (adjust.length) text = adjust.map((r) => r.text).join(' ');
+  else if (f.found) text = 'Everything looks good. Hold this position.';
+  else text = els.coach.textContent;
+  S.announce.at = Date.now() + 6000;
+  showCheck(text);
 }
 
 /* ---------- Wiring ---------- */
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
-function toggleMute() {
+function toggleLive() {
   unlockSpeech();
   S.paused = !S.paused;
-  els.pause.textContent = S.paused ? 'Resume voice feedback' : 'Pause voice feedback';
-  say(S.paused ? 'Voice feedback muted. Press M to unmute, or N to hear the advice when you want it.' : 'Voice feedback resumed.');
+  els.pause.textContent = S.paused ? 'Start live voice feedback' : 'Stop live voice feedback';
+  if (!S.paused) S.announce = { cand: null, count: 0, spoken: null, at: 0 };
+  say(S.paused ? 'Live voice feedback is off. Press Check my picture now whenever you want advice.' : 'Live voice feedback is on. I will speak adjustments as you move.');
 }
-function adviceNow() {
-  unlockSpeech();
-  if (!S.stream) { say('Press S to start the camera and microphone.'); return; }
-  S.announce.at = Date.now();
-  say(els.coach.textContent);
-}
-els.pause.addEventListener('click', toggleMute);
+els.pause.addEventListener('click', toggleLive);
+els.checkBtn.addEventListener('click', checkNow);
 els.voiceBtn.addEventListener('click', () => { runVoiceTest(); });
 els.playBtn.addEventListener('click', () => { if (S.testing) return; els.voiceStatus.textContent = 'Playing back…'; playClip().then(() => { els.voiceStatus.textContent = 'Playback finished.'; }); });
 /* Shortcut keys: plain letters, or Alt+Shift+letter for screen readers that keep plain letters.
@@ -1337,8 +1369,8 @@ document.addEventListener('keydown', (e) => {
   const busy = () => { if (S.testing) { els.voiceStatus.textContent = 'Please wait until the voice test finishes.'; return true; } return false; };
   switch (e.code) {
     case 'KeyS': e.preventDefault(); unlockSpeech(); if (S.stream) stop(); else start(); break;
-    case 'KeyM': e.preventDefault(); toggleMute(); break;
-    case 'KeyN': e.preventDefault(); if (!busy()) adviceNow(); break;
+    case 'KeyL': case 'KeyM': e.preventDefault(); toggleLive(); break;
+    case 'KeyC': case 'KeyN': e.preventDefault(); if (!busy()) checkNow(); break;
     case 'KeyD': e.preventDefault(); if (!busy()) { unlockSpeech(); describeSetup(); } break;
     case 'KeyV': e.preventDefault(); if (S.analyser) runVoiceTest(); else { unlockSpeech(); say('Press S to start the microphone first.'); } break;
     default: break;
