@@ -333,7 +333,7 @@ const CFG = {
   topEdgeMin: 0.06,
   topLowMax: 0.34,
   bottomMax: 0.92,
-  tiltMaxDeg: 6,
+  tiltMaxDeg: 10,
   yawOk: 0.2, yawFar: 0.4,
   faceDark: 50,               // 0 to 255 brightness
   faceBright: 205,
@@ -380,7 +380,7 @@ const S = {
   busy: false, samples: [], lastFace: null, faceOk: false,
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
-  announce: { cand: null, count: 0, spoken: null, at: 0 },
+  announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
   paused: true, utter: null,
 };
 
@@ -616,7 +616,7 @@ async function attach({ stream, kind, err }) {
   S.samples = [];
   S.voice = null;
   S.camInfo = null;
-  S.announce = { cand: null, count: 0, spoken: null, at: 0 };
+  S.announce = { cand: null, count: 0, spoken: null, spokenId: null, at: 0 };
   for (const t of [S.videoTrack, S.audioTrack]) if (t) t.addEventListener('ended', onTrackEnded);
 
   if (S.videoTrack) {
@@ -1299,13 +1299,22 @@ function evaluateAndRender() {
   else if (S.detectorState === 'unavailable') coach = 'Face checks are unavailable. Lighting and sound checks still work.';
   else coach = 'Getting ready…';
   if (els.coach.textContent !== coach) els.coach.textContent = coach;
-  if (S.videoTrack) maybeAnnounce(top, f);
+  if (S.videoTrack) maybeAnnounce(top, f, issues);
 }
 
-function maybeAnnounce(top, f) {
+function maybeAnnounce(top, f, issues) {
   if (S.paused || S.testing) return;
   const A = S.announce;
   const now = Date.now();
+  /* When the thing that was last spoken about has been corrected, say so straight away, without the
+     usual wait, so the person knows it worked. */
+  if (A.spokenId && !(issues || []).some((r) => r.id === A.spokenId) && (f.found || A.spokenId === 'face')) {
+    const text = top ? 'Good, that is corrected. ' + top.text : 'Good, that is corrected. Everything looks good. Hold this position.';
+    say(text, { auto: true });
+    A.spoken = top ? top.key : 'ok'; A.spokenId = top ? top.id : null; A.at = now;
+    A.cand = A.spoken; A.count = 2;
+    return;
+  }
   let key;
   if (top) key = top.key;
   else if (f.found) key = 'ok';
@@ -1314,7 +1323,7 @@ function maybeAnnounce(top, f) {
   if (A.count < 2) return;
   const text = top ? top.text : 'Everything looks good. Hold this position.';
   if (key !== A.spoken && now - A.at >= 3000) {
-    say(text, { auto: true }); A.spoken = key; A.at = now;
+    say(text, { auto: true }); A.spoken = key; A.spokenId = top ? top.id : null; A.at = now;
   } else if (key === A.spoken && key !== 'ok' && now - A.at >= 12000) {
     say(text, { auto: true }); A.at = now;
   }
@@ -1387,7 +1396,7 @@ function toggleLive() {
   unlockSpeech();
   S.paused = !S.paused;
   els.pause.textContent = S.paused ? 'Start live voice feedback' : 'Stop live voice feedback';
-  if (!S.paused) S.announce = { cand: null, count: 0, spoken: null, at: 0 };
+  if (!S.paused) S.announce = { cand: null, count: 0, spoken: null, spokenId: null, at: 0 };
   say(S.paused ? 'Live voice feedback is off. Press Check my picture now whenever you want advice.' : 'Live voice feedback is on. I will speak adjustments as you move.');
 }
 els.pause.addEventListener('click', toggleLive);
