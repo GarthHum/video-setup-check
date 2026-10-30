@@ -287,7 +287,8 @@
       <details>
         <summary>Voice feedback</summary>
         <p>The page speaks advice with your browser's built-in voice, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Choose Pause voice feedback to stop the automatic advice, and Resume voice feedback to bring it back. Pausing does not stop what you ask for with the Describe my setup button or the N key, so you can mute the voice and still ask for advice on demand.</p>
-        <p>The voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing after pressing Start, check that your computer volume is up.</p>
+        <p>On an iPhone or iPad the advice is read by VoiceOver instead of the browser voice, because Safari on iOS silences the browser voice while the microphone is open. Turn VoiceOver on to hear it. Pause voice feedback still mutes the automatic advice.</p>
+        <p>On a computer the voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing after pressing Start, check that your computer volume is up.</p>
       </details>
       <details>
         <summary>Shortcut keys</summary>
@@ -383,9 +384,30 @@ const S = {
 /* ---------- Announcements ---------- */
 /* Advice is spoken with the browser's own voice (speechSynthesis). If the browser has no speech
    at all, the on-screen advice line becomes a live region instead. */
-const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+/* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
+   passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
-if (!synth) els.coach.setAttribute('aria-live', 'polite');
+const liveRegion = document.createElement('div');
+liveRegion.className = 'vh';
+liveRegion.id = 'liveAdvice';
+liveRegion.setAttribute('role', 'status');
+liveRegion.setAttribute('aria-live', 'polite');
+liveRegion.setAttribute('aria-atomic', 'true');
+document.body.appendChild(liveRegion);
+let liveFlip = false;
+function liveSay(text) {
+  return new Promise((resolve) => {
+    liveRegion.textContent = '';
+    setTimeout(() => {
+      liveFlip = !liveFlip;
+      liveRegion.textContent = text + (liveFlip ? '\u00a0' : '');   /* changes even when the words repeat */
+      setTimeout(resolve, Math.min(8000, 800 + text.length * 70));
+    }, 80);
+  });
+}
+if (!synth && !IOS) els.coach.setAttribute('aria-live', 'polite');
 
 /* Safari only allows speech after a click or key press, so every button that can lead to
    speech calls this first, inside its own click handler. */
@@ -399,6 +421,7 @@ function unlockSpeech() {
   } catch (e) { /* ignore */ }
 }
 function speak(text, interrupt) {
+  if (IOS) return liveSay(text);
   return new Promise((resolve) => {
     if (!synth) { resolve(); return; }
     let finished = false;
