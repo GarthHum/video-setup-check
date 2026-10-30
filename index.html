@@ -616,8 +616,15 @@ async function attach({ stream, kind, err }) {
   if (ON_DEMAND_MIC && S.audioTrack) {
     try { S.audioTrack.stop(); stream.removeTrack(S.audioTrack); } catch (e) { /* ignore */ }
     S.audioTrack = null;
-    sessionToPlayback();
+  } else if (ON_DEMAND_MIC) {
+    /* The combined request gave no microphone (Safari sometimes drops it), so ask for the permission
+       on its own now and release the microphone again at once. */
+    try {
+      const m = await navigator.mediaDevices.getUserMedia({ audio: true });
+      m.getTracks().forEach((tr) => tr.stop());
+    } catch (e) { /* the voice test will explain if the microphone is blocked */ }
   }
+  if (ON_DEMAND_MIC) sessionToPlayback();
   S.samples = [];
   S.voice = null;
   S.camInfo = null;
