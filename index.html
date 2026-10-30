@@ -535,12 +535,17 @@ async function openMedia(camId, micId, retried) {
     { video: false, audio, kind: 'audio' },
   ];
   let firstErr = null;
+  sessionToCapture();
   for (const a of attempts) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: a.video, audio: a.audio });
-      return { stream, kind: a.kind, err: firstErr };
-    } catch (e) {
-      if (!firstErr) firstErr = e;
+    for (let go = 0; go < 2; go++) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: a.video, audio: a.audio });
+        return { stream, kind: a.kind, err: firstErr };
+      } catch (e) {
+        if (!firstErr) firstErr = e;
+        if (!(e && e.name === 'InvalidStateError' && go === 0)) break;
+        await new Promise((r) => setTimeout(r, 400));   /* one retry for a busy audio session */
+      }
     }
   }
   if (!retried && (camId || micId)) return openMedia('', '', true);
@@ -616,13 +621,6 @@ async function attach({ stream, kind, err }) {
   if (ON_DEMAND_MIC && S.audioTrack) {
     try { S.audioTrack.stop(); stream.removeTrack(S.audioTrack); } catch (e) { /* ignore */ }
     S.audioTrack = null;
-  } else if (ON_DEMAND_MIC) {
-    /* The combined request gave no microphone (Safari sometimes drops it), so ask for the permission
-       on its own now and release the microphone again at once. */
-    try {
-      const m = await navigator.mediaDevices.getUserMedia({ audio: true });
-      m.getTracks().forEach((tr) => tr.stop());
-    } catch (e) { /* the voice test will explain if the microphone is blocked */ }
   }
   if (ON_DEMAND_MIC) sessionToPlayback();
   S.samples = [];
@@ -676,10 +674,18 @@ function onTrackEnded() {
   stop();
 }
 
+let sessionTimer = 0;
+function setAudioSession(t) { try { if (navigator.audioSession) navigator.audioSession.type = t; } catch (e) { /* ignore */ } }
 function sessionToPlayback() {
-  const setSession = (t) => { try { if (navigator.audioSession) navigator.audioSession.type = t; } catch (e) { /* ignore */ } };
-  setSession('playback');
-  setTimeout(() => setSession('auto'), 1500);
+  clearTimeout(sessionTimer);
+  setAudioSession('playback');
+  sessionTimer = setTimeout(() => setAudioSession('auto'), 1500);
+}
+/* Before the page asks for the microphone, the audio session must allow recording; a leftover
+   playback setting makes Safari refuse with InvalidStateError. */
+function sessionToCapture() {
+  clearTimeout(sessionTimer);
+  setAudioSession('auto');
 }
 
 /* Stops the microphone and its analysis, and releases the phone's audio session. */
@@ -704,6 +710,7 @@ function releaseAudio() {
 
 async function openMic() {
   const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  sessionToCapture();
   const stream = await navigator.mediaDevices.getUserMedia({ audio });
   S.audioTrack = stream.getAudioTracks()[0] || null;
   if (!S.audioTrack) throw new Error('No microphone track');
