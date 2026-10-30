@@ -266,7 +266,7 @@
       <h2 id="help-h">Help</h2>
       <details>
         <summary>What happens to my video and audio?</summary>
-        <p>Your video and audio are not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The microphone is used to measure how loud you are. During the voice test only, the six seconds of your voice are also held in your browser's memory so the page can play them back to you. That sound stays on your computer, and it is discarded when you run the test again, stop the camera and microphone, or leave the page.</p>
+        <p>Your video and audio are not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The microphone is used to measure how loud you are. During the voice test only (the only time the microphone is used on an iPhone or iPad), the six seconds of your voice are also held in your browser's memory so the page can play them back to you. That sound stays on your computer, and it is discarded when you run the test again, stop the camera and microphone, or leave the page.</p>
         <p>Nothing is saved to your computer. Everything exists only in your browser's memory while the page is open. Choosing Stop camera and microphone, closing the tab, or leaving the page turns the camera and microphone off and clears it all.</p>
         <p>This page saves nothing on your computer: no video, audio, results or settings. It sets no cookies, has no accounts and has no analytics.</p>
         <p>Some things are downloaded to your browser. The first time the face detector runs, your browser downloads its program code from the jsDelivr code delivery service and its small face model file from Google's servers. These are downloads to your computer and do not include your video. As with any website, the servers that provide the page and those files can see ordinary visit details such as your internet address and browser type. The page itself is hosted on GitHub Pages.</p>
@@ -282,7 +282,7 @@
       </details>
       <details>
         <summary>How the checks work</summary>
-        <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Facing the camera compares the position of your nose with your eyes, so it measures which way your head is turned, not where your eyes are looking. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
+        <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Distance compares the height of your face with the shorter side of the picture, so it works the same whether the picture is wide, like a laptop camera, or tall, like a phone held upright. Facing the camera compares the position of your nose with your eyes, so it measures which way your head is turned, not where your eyes are looking. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
         <p>The microphone meter and voice test turn off echo cancellation, noise suppression and automatic gain, so the numbers reflect what a recording app would capture. Video call apps often boost a quiet microphone automatically, so this page can read lower than they do. Levels are peak levels in decibels relative to full scale, like the meters in recording software. Zero is the point where the sound distorts, and healthy speech peaks around minus 12. Your average level reads lower than the peaks, usually by 10 decibels or more.</p>
         <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
       </details>
@@ -290,7 +290,7 @@
         <summary>Voice feedback</summary>
         <p>There are two ways to get advice on your picture. Press Check my picture now, or the C key, and the advice appears as text just below the buttons, with your screen reader moved onto it so it reads it out. Nothing is spoken by the page for this. Or press Start live voice feedback, or the L key, and the page speaks each adjustment as you move, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Stop live voice feedback turns it off again. Live voice feedback is off until you turn it on.</p>
         <p>Describe my setup works the same way as Check my picture now: the whole summary of picture and sound appears as text and your screen reader is moved onto it. The voice test works like this too.</p>
-        <p>On an iPhone or iPad, live voice feedback is read by VoiceOver instead of the browser voice, because Safari on iOS silences the browser voice while the microphone is open. Turn VoiceOver on to hear it. On a computer the live voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your volume is up.</p>
+        <p>On an iPhone or iPad the microphone is switched on only while the voice test runs, and switched off again when it finishes, because Safari on iOS can stay in recording mode and silence VoiceOver after the microphone has been used. Live voice feedback is read by VoiceOver instead of the browser voice, because Safari on iOS silences the browser voice while the microphone is open. Turn VoiceOver on to hear it. On a computer the live voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your volume is up.</p>
       </details>
       <details>
         <summary>Shortcut keys</summary>
@@ -326,7 +326,7 @@ const CFG = {
   window: 7,
   centerTolerance: 0.07,      // fraction of frame width
   centerFar: 0.16,
-  faceHeightGood: [0.22, 0.5], // face box height as a fraction of frame height
+  faceHeightGood: [0.22, 0.5], // face box height as a fraction of the SHORTER side of the picture
   faceHeightFar: 0.14,
   faceHeightNear: 0.62,
   topEdgeMin: 0.06,
@@ -389,6 +389,7 @@ const S = {
 /* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
    passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const ON_DEMAND_MIC = IOS;   /* on iPhone the microphone is opened only while the voice test runs */
 const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
 const liveRegion = document.createElement('div');
@@ -528,7 +529,7 @@ async function openMedia(camId, micId, retried) {
   if (camId) video.deviceId = { exact: camId };
   const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
   if (micId) audio.deviceId = { exact: micId };
-  const attempts = [
+  const attempts = ON_DEMAND_MIC ? [{ video, audio: false, kind: 'video' }] : [
     { video, audio, kind: 'both' },
     { video, audio: false, kind: 'video' },
     { video: false, audio, kind: 'audio' },
@@ -637,13 +638,13 @@ async function attach({ stream, kind, err }) {
   await refreshDevices();
   if (navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
 
-  if (kind === 'video') showNotice('The microphone could not be started: ' + explainError(err) + ' Camera checks still work.', 'warn');
+  if (kind === 'video' && !ON_DEMAND_MIC) showNotice('The microphone could not be started: ' + explainError(err) + ' Camera checks still work.', 'warn');
   if (kind === 'audio') showNotice('The camera could not be started: ' + explainError(err) + ' Microphone checks still work.', 'warn');
 
   els.start.textContent = 'Stop camera and microphone';
   els.describe.disabled = false;
   els.checkBtn.disabled = !S.videoTrack;
-  els.voiceBtn.disabled = !S.analyser;
+  els.voiceBtn.disabled = !(S.analyser || (ON_DEMAND_MIC && S.stream));
   S.timers.evaluate = setInterval(evaluateAndRender, CFG.evaluateEveryMs);
   if (S.videoTrack) {
     S.timers.detect = setInterval(tick, CFG.detectEveryMs);
@@ -661,29 +662,47 @@ function onTrackEnded() {
   stop();
 }
 
-function stopStream() {
-  clearInterval(S.timers.detect);
+/* Stops the microphone and its analysis, and releases the phone's audio session. */
+function releaseAudio() {
   clearInterval(S.timers.audio);
-  clearInterval(S.timers.evaluate);
   try {
     if (S.proc) { S.proc.onaudioprocess = null; S.proc.disconnect(); }
     if (S.srcNode) S.srcNode.disconnect();
     if (S.analyser) S.analyser.disconnect();
   } catch (e) { /* ignore */ }
-  if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
+  if (S.audioTrack) { try { S.audioTrack.stop(); } catch (e) { /* ignore */ } }
   if (S.audioCtx) { try { S.audioCtx.close(); } catch (e) { /* ignore */ } }
-  /* On iPhone, Safari can leave the audio session in recording mode after the microphone stops, which
-     silences VoiceOver until Safari is left. Asking for the default session type releases it. */
   const resetSession = () => { try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) { /* ignore */ } };
   resetSession();
   setTimeout(resetSession, 300);
+  S.audioCtx = null; S.analyser = null; S.srcNode = null; S.buf = null; S.proc = null; S.rec = null;
+  S.audioTrack = null;
+  S.mic.shown = -100;
+  els.meterValue.textContent = 'Off';
+  els.meterCover.style.left = '0%';
+}
+
+async function openMic() {
+  const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  const stream = await navigator.mediaDevices.getUserMedia({ audio });
+  S.audioTrack = stream.getAudioTracks()[0] || null;
+  if (!S.audioTrack) throw new Error('No microphone track');
+  setupAudio(S.audioTrack);
+}
+
+function stopStream() {
+  clearInterval(S.timers.detect);
+  clearInterval(S.timers.audio);
+  clearInterval(S.timers.evaluate);
+  releaseAudio();
+  if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
   try { els.video.pause(); } catch (e) { /* ignore */ }
   if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) {
     navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
   }
   S.stream = null; S.videoTrack = null; S.audioTrack = null; S.camInfo = null;
-  S.audioCtx = null; S.analyser = null; S.srcNode = null; S.buf = null;
   S.lastFace = null; S.samples = [];
+  S.voice = null;
   S.mic.shown = -100;
   S.proc = null; S.rec = null; S.clip = null;
   els.video.srcObject = null;
@@ -801,7 +820,11 @@ function pickFace(faces) {
     const eyeDist = Math.abs(f.eyes.l.x - f.eyes.r.x);
     if (eyeDist > 0.005) yaw = (f.nose.x - (f.eyes.l.x + f.eyes.r.x) / 2) / eyeDist;
   }
-  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, tilt, yaw, count: faces.length };
+  /* Face size is measured against the shorter side of the picture. A phone held upright gives a tall
+     picture, and measuring against its height would wrongly make a normal arm's-length face look small. */
+  const vw = els.video.videoWidth || 1, vh = els.video.videoHeight || 1;
+  const size = f.h * vh / Math.min(vw, vh);
+  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, size, tilt, yaw, count: faces.length };
 }
 
 const SC = document.createElement('canvas');
@@ -987,19 +1010,22 @@ function discardClip() {
 }
 
 function playClip() {
-  if (!S.clip || !S.audioCtx || S.playing) return Promise.resolve();
+  if (!S.clip || S.playing) return Promise.resolve();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ctx = S.audioCtx, own = false;
+  if (!ctx) { if (!AC) return Promise.resolve(); ctx = new AC(); own = true; }
   S.playing = true;
   return new Promise((resolve) => {
     let done = false;
-    const finish = () => { if (done) return; done = true; S.playing = false; resolve(); };
+    const finish = () => { if (done) return; done = true; S.playing = false; if (own) { try { ctx.close(); } catch (e) { /* ignore */ } } resolve(); };
     try {
       const c = S.clip;
-      if (S.audioCtx.state === 'suspended') S.audioCtx.resume().catch(() => {});
-      const buf = S.audioCtx.createBuffer(1, c.data.length, c.rate);
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const buf = ctx.createBuffer(1, c.data.length, c.rate);
       buf.getChannelData(0).set(c.data);
-      const src = S.audioCtx.createBufferSource();
+      const src = ctx.createBufferSource();
       src.buffer = buf;
-      src.connect(S.audioCtx.destination);
+      src.connect(ctx.destination);
       src.onended = finish;
       src.start();
       setTimeout(finish, (c.data.length / c.rate) * 1000 + 1500);
@@ -1008,7 +1034,12 @@ function playClip() {
 }
 
 async function runVoiceTest() {
-  if (!S.analyser || S.testing) return;
+  if (S.testing) return;
+  if (!S.analyser) {
+    if (!(ON_DEMAND_MIC && S.stream)) return;
+    els.voiceStatus.textContent = 'Turning on the microphone…';
+    try { await openMic(); } catch (e) { els.voiceStatus.textContent = 'The microphone could not be started. ' + explainError(e); return; }
+  }
   const T = CFG.voice;
   S.testing = true;
   /* The button stays enabled so keyboard focus is not lost; clicks are ignored while testing. */
@@ -1067,7 +1098,9 @@ async function runVoiceTest() {
     S.testing = false;
     els.voiceBtn.removeAttribute('aria-disabled');
     els.voiceBtn.textContent = 'Test my voice';
-    els.voiceBtn.disabled = !S.analyser;
+    if (ON_DEMAND_MIC && S.analyser) releaseAudio();
+    els.voiceBtn.disabled = !(S.analyser || (ON_DEMAND_MIC && S.stream));
+    if (ON_DEMAND_MIC) renderSound();
   }
 }
 
@@ -1089,8 +1122,9 @@ function analyseVoice(quiet, speech) {
 function evaluateSound() {
   const out = [];
   const push = (id, state, text) => out.push({ id, state, text });
-  if (!S.analyser) {
-    for (const [id] of SOUND_ROWS) push(id, 'unknown', S.stream ? 'No microphone is running.' : 'Press Start to check this.');
+  if (!S.analyser && !S.voice) {
+    const none = !S.stream ? 'Press Start to check this.' : (ON_DEMAND_MIC ? 'Run the voice test to check this.' : 'No microphone is running.');
+    for (const [id] of SOUND_ROWS) push(id, ON_DEMAND_MIC && S.stream ? 'untested' : 'unknown', none);
     return out;
   }
   const v = S.voice;
@@ -1136,7 +1170,7 @@ function currentFace() {
   return {
     ready: true, found: true,
     count: Math.round(m((s) => s.face.count)),
-    cx: m((s) => s.face.cx), top: m((s) => s.face.top), bottom: m((s) => s.face.bottom), h: m((s) => s.face.h),
+    cx: m((s) => s.face.cx), top: m((s) => s.face.top), bottom: m((s) => s.face.bottom), h: m((s) => s.face.h), size: m((s) => s.face.size),
     tilt: num((s) => s.face.tilt),
     yaw: num((s) => s.face.yaw),
     lFace: num((s) => s.luma.face), lLeft: num((s) => s.luma.imgLeft), lRight: num((s) => s.luma.imgRight), lBg: num((s) => s.luma.bg),
@@ -1195,11 +1229,11 @@ function evaluatePicture() {
     else if (f.top > CFG.topLowMax) push('height', 'adjust', 'There is a lot of empty space above your head. Tilt the camera down a little, or raise the camera.', 3, 'height:low');
     else push('height', 'good', 'Your head sits well in the picture.', 3);
 
-    if (f.h < CFG.faceHeightGood[0]) {
-      const far = f.h < CFG.faceHeightFar;
+    if (f.size < CFG.faceHeightGood[0]) {
+      const far = f.size < CFG.faceHeightFar;
       push('distance', 'adjust', far ? 'You are far from the camera. Move closer, or zoom in if your camera allows.' : 'Move a little closer to the camera, or zoom in if your camera allows.', 4, 'distance:far:' + far);
-    } else if (f.h > CFG.faceHeightGood[1]) {
-      const near = f.h > CFG.faceHeightNear;
+    } else if (f.size > CFG.faceHeightGood[1]) {
+      const near = f.size > CFG.faceHeightNear;
       push('distance', 'adjust', near ? 'You are very close to the camera. Move back.' : 'Move back a little.', 4, 'distance:near:' + near);
     } else push('distance', 'good', 'Your distance looks good for head and shoulders.', 4);
 
@@ -1304,7 +1338,7 @@ function buildReport() {
     p1.textContent = parts.join(' ');
   }
 
-  if (!S.analyser) p2.textContent = 'Sound. No microphone is running.';
+  if (!S.analyser && !S.voice && !ON_DEMAND_MIC) p2.textContent = 'Sound. No microphone is running.';
   else if (!S.voice) p2.textContent = 'Sound. The voice test has not been run yet. Choose Test my voice.';
   else p2.textContent = 'Sound. ' + snd.map((r) => r.text).join(' ');
   return [p1, p2];
@@ -1372,7 +1406,7 @@ document.addEventListener('keydown', (e) => {
     case 'KeyL': case 'KeyM': e.preventDefault(); toggleLive(); break;
     case 'KeyC': case 'KeyN': e.preventDefault(); if (!busy()) checkNow(); break;
     case 'KeyD': e.preventDefault(); if (!busy()) { unlockSpeech(); describeSetup(); } break;
-    case 'KeyV': e.preventDefault(); if (S.analyser) runVoiceTest(); else { unlockSpeech(); say('Press S to start the microphone first.'); } break;
+    case 'KeyV': e.preventDefault(); if (S.analyser || (ON_DEMAND_MIC && S.stream)) runVoiceTest(); else { unlockSpeech(); say('Press S to start the microphone first.'); } break;
     default: break;
   }
 });
