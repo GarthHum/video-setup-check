@@ -208,8 +208,7 @@
       <p id="checkResult" tabindex="-1"></p>
       <p id="voiceStatus" class="small"></p>
       <p id="voiceResult" tabindex="-1"></p>
-      <p id="iosMicNote" class="small" hidden>On an iPhone or iPad, VoiceOver may go quiet after the voice test. If it does, leave Safari and come back, and it will speak again.</p>
-      <p class="small" id="voiceHelp">Press Test my voice. After a moment you will hear a low beep. Stay silent until you hear a high beep, which takes about two seconds. Then speak normally for six seconds, until you hear two short beeps. Your voice then plays back so you can hear what the microphone caught, and the results appear below.</p>
+      <p class="small" id="voiceHelp">Press Test my voice. When you hear the beep, speak normally for six seconds. Two short beeps mean it has finished, and your voice then plays back.</p>
       <p class="small" id="keysHint">Shortcut keys: S start or stop, C check my picture now, V voice test, L live voice feedback on or off, D describe my setup. Details are in Help.</p>
       <div class="selects">
         <div class="field">
@@ -344,7 +343,7 @@ const CFG = {
   minHeightPx: 720,
   mic: { veryQuiet: -42, quiet: -32, loud: -3, clipPeak: 0.98, clipFrames: 3, floor: -70 },
   noise: { quiet: -62, some: -50, minGap: 25 },
-  voice: { quietSec: 2, speakSec: 6 },
+  voice: { quietSec: 1.2, speakSec: 6 },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -390,8 +389,7 @@ const S = {
 /* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
    passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const ON_DEMAND_MIC = IOS;
-if (IOS) { const n = document.getElementById('iosMicNote'); if (n) n.hidden = false; }   /* on iPhone the microphone is opened only while the voice test runs */
+const ON_DEMAND_MIC = IOS;   /* on iPhone the microphone is opened only while the voice test runs */
 const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
 const liveRegion = document.createElement('div');
@@ -1066,13 +1064,11 @@ async function runVoiceTest() {
   renderSound();
   try {
     if (S.audioCtx && S.audioCtx.state === 'suspended') { try { await S.audioCtx.resume(); } catch (e) { /* ignore */ } }
-    els.voiceStatus.textContent = 'Get ready. A low beep is coming, then stay silent.';
-    await sleep(600);
-    beep(520, 0.2);
+    els.voiceStatus.textContent = 'Get ready. Speak when you hear the beep.';
     await sleep(900);
     if (!S.analyser) return;
     S.testBuf = [];
-    await countdown(T.quietSec, 'Stay silent');
+    await countdown(T.quietSec, 'Get ready');   /* the room noise is measured here, before the beep */
     const quiet = S.testBuf || [];
     if (!S.analyser) return;
     beep(880, 0.2);
@@ -1124,7 +1120,7 @@ function analyseVoice(quiet, speech) {
   const q = quiet.map((f) => f.db).sort((a, b) => a - b);
   const s = speech.map((f) => f.db).sort((a, b) => a - b);
   const sp = speech.map((f) => f.pdb).sort((a, b) => a - b);
-  const noise = pct(q, 0.5);
+  const noise = Math.min(pct(q, 0.5), pct(s, 0.1));   /* lead-in before the beep, or the quietest moments of the speech */
   const level = pct(s, 0.9);        /* average loudness (RMS), compared against room noise */
   const peakLevel = pct(sp, 0.9);   /* typical peak, like a recording meter */
   const peak = Math.max(...speech.map((f) => f.peak));
