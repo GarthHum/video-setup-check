@@ -251,6 +251,7 @@
             <button type="button" id="playBtn" class="btn secondary" disabled>Play back my voice</button>
           </div>
           <p id="voiceStatus" class="small"></p>
+          <p id="iosMicNote" class="small" hidden>On an iPhone or iPad, VoiceOver may go quiet after the voice test. If it does, leave Safari and come back, and it will speak again.</p>
           <p id="voiceResult" tabindex="-1"></p>
         </div>
         <ul class="checks" id="soundList"></ul>
@@ -389,7 +390,8 @@ const S = {
 /* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
    passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const ON_DEMAND_MIC = IOS;   /* on iPhone the microphone is opened only while the voice test runs */
+const ON_DEMAND_MIC = IOS;
+if (IOS) { const n = document.getElementById('iosMicNote'); if (n) n.hidden = false; }   /* on iPhone the microphone is opened only while the voice test runs */
 const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
 const liveRegion = document.createElement('div');
@@ -672,9 +674,11 @@ function releaseAudio() {
   } catch (e) { /* ignore */ }
   if (S.audioTrack) { try { S.audioTrack.stop(); } catch (e) { /* ignore */ } }
   if (S.audioCtx) { try { S.audioCtx.close(); } catch (e) { /* ignore */ } }
-  const resetSession = () => { try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) { /* ignore */ } };
-  resetSession();
-  setTimeout(resetSession, 300);
+  /* Switch the page's audio session to plain playback straight away, which ends recording mode, then
+     hand control back to the system a moment later. */
+  const setSession = (t) => { try { if (navigator.audioSession) navigator.audioSession.type = t; } catch (e) { /* ignore */ } };
+  setSession('playback');
+  setTimeout(() => setSession('auto'), 1500);
   S.audioCtx = null; S.analyser = null; S.srcNode = null; S.buf = null; S.proc = null; S.rec = null;
   S.audioTrack = null;
   S.mic.shown = -100;
