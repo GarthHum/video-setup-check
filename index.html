@@ -1113,7 +1113,7 @@ async function runVoiceTest() {
       if (!S.analyser) return;
       els.voiceStatus.textContent = 'Playing back what the microphone heard…';
       await playClip();
-      els.voiceStatus.textContent = 'Playback finished. Replay my last voice test, in the Sound section, plays it again.';
+      els.voiceStatus.textContent = 'Playback finished.';
     } else {
       els.voiceStatus.textContent = 'Test finished.';
     }
