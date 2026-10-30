@@ -202,7 +202,6 @@
         <button type="button" id="checkBtn" class="btn secondary" aria-keyshortcuts="C" disabled>Check my picture now</button>
         <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="L">Start live voice feedback</button>
         <button type="button" id="voiceBtn" class="btn secondary" aria-keyshortcuts="V" disabled>Test my voice</button>
-        <button type="button" id="playBtn" class="btn secondary" disabled>Play back my voice</button>
         <button type="button" id="describeBtn" class="btn secondary" aria-keyshortcuts="D" disabled>Describe my setup</button>
       </div>
       <div id="errorBox" class="notice" role="alert" hidden></div>
@@ -251,6 +250,9 @@
           <div class="meter-label"><span>Microphone peak level now</span><span id="meterValue" class="num">Off</span></div>
           <div class="meter" id="meter" aria-hidden="true"><div class="meter-cover" id="meterCover"></div></div>
           <div class="zones" id="zones" aria-hidden="true"><span id="zoneLow">Too quiet</span><span id="zoneGood">Good</span><span id="zoneHot">Too loud</span></div>
+          <div class="control-row" style="margin-top:1rem">
+            <button type="button" id="playBtn" class="btn secondary" disabled>Replay my last voice test</button>
+          </div>
         </div>
         <ul class="checks" id="soundList"></ul>
       </div>
@@ -282,7 +284,7 @@
       <details>
         <summary>How the checks work</summary>
         <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Distance compares the height of your face with the shorter side of the picture, so it works the same whether the picture is wide, like a laptop camera, or tall, like a phone held upright. Facing the camera compares the position of your nose with your eyes, so it measures which way your head is turned, not where your eyes are looking. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
-        <p>The microphone meter and voice test turn off echo cancellation, noise suppression and automatic gain, so the numbers reflect what a recording app would capture. Video call apps often boost a quiet microphone automatically, so this page can read lower than they do. Levels are peak levels in decibels relative to full scale, like the meters in recording software. Zero is the point where the sound distorts, and healthy speech peaks around minus 12. Your average level reads lower than the peaks, usually by 10 decibels or more.</p>
+        <p>The microphone meter and voice test turn off echo cancellation, noise suppression and automatic gain, so the numbers reflect what a recording app would capture. Video call apps often boost a quiet microphone automatically, so this page can read lower than they do. Levels are peak levels in decibels relative to full scale, like the meters in recording software. Zero is the point where the sound distorts, and speech that peaks between about minus 30 and minus 6 is fine. A little below that is often still usable, so trust the playback too. Your average level reads lower than the peaks, usually by 10 decibels or more.</p>
         <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
       </details>
       <details>
@@ -340,7 +342,7 @@ const CFG = {
   backlitMinBg: 110,
   sideGap: 30,
   minHeightPx: 720,
-  mic: { veryQuiet: -36, quiet: -24, loud: -3, clipPeak: 0.98, clipFrames: 3, floor: -70 },
+  mic: { veryQuiet: -42, quiet: -32, loud: -3, clipPeak: 0.98, clipFrames: 3, floor: -70 },
   noise: { quiet: -62, some: -50, minGap: 25 },
   voice: { quietSec: 2, speakSec: 6 },
 };
@@ -1101,7 +1103,7 @@ async function runVoiceTest() {
       if (!S.analyser) return;
       els.voiceStatus.textContent = 'Playing back what the microphone heard…';
       await playClip();
-      els.voiceStatus.textContent = 'Playback finished. Use Play back my voice to hear it again.';
+      els.voiceStatus.textContent = 'Playback finished. Replay my last voice test, in the Sound section, plays it again.';
     } else {
       els.voiceStatus.textContent = 'Test finished.';
     }
@@ -1154,8 +1156,9 @@ function evaluateSound() {
     return out;
   }
   const lv = fmtDb(v.peakLevel);
-  if (v.peakLevel < M.veryQuiet) push('voice', 'adjust', 'Your voice peaks at only about ' + lv + ', which is very quiet. A healthy level is around minus 12. Raise the microphone input volume, move closer to the microphone, or choose another microphone. On a Mac, use System Settings, Sound, Input. On Windows, use Settings, System, Sound, Input.');
-  else if (v.peakLevel < M.quiet) push('voice', 'adjust', 'Your voice peaks at about ' + lv + ', which is a little quiet. A healthy level is around minus 12. Move closer to the microphone or raise its input volume.');
+  const clearGap = (v.level - v.noise) >= 40;   /* a voice far above the room noise is fine even if the level is modest */
+  if (v.peakLevel < M.veryQuiet) push('voice', 'adjust', 'Your voice peaks at only about ' + lv + ', which is very quiet. A good range is roughly minus 30 to minus 6. Raise the microphone input volume, move closer to the microphone, or choose another microphone. On a Mac, use System Settings, Sound, Input. On Windows, use Settings, System, Sound, Input.');
+  else if (v.peakLevel < M.quiet && !clearGap) push('voice', 'adjust', 'Your voice peaks at about ' + lv + ', which is a little quiet. A good range is roughly minus 30 to minus 6. If the playback sounded fine to you, you can leave it. Otherwise move closer to the microphone or raise its input volume.');
   else if (v.peakLevel > M.loud) push('voice', 'adjust', 'Your voice peaks at about ' + lv + ', which is very loud. Lower the input volume or move back from the microphone.');
   else push('voice', 'good', 'Your voice level is good. It peaks at about ' + lv + '.');
 
