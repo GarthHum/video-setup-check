@@ -208,7 +208,7 @@
       <p id="checkResult" tabindex="-1"></p>
       <p id="voiceStatus" class="small"></p>
       <p id="voiceResult" tabindex="-1"></p>
-      <p class="small" id="voiceHelp">Press Test my voice. When you hear the beep, speak normally for six seconds. Two short beeps mean it has finished, and your voice then plays back.</p>
+      <p class="small" id="voiceHelp">Press Test my voice, then speak after the beep.</p>
       <p class="small" id="keysHint">Shortcut keys: S start or stop, C check my picture now, V voice test, L live voice feedback on or off, D describe my setup. Details are in Help.</p>
       <div class="selects">
         <div class="field">
@@ -1064,11 +1064,11 @@ async function runVoiceTest() {
   renderSound();
   try {
     if (S.audioCtx && S.audioCtx.state === 'suspended') { try { await S.audioCtx.resume(); } catch (e) { /* ignore */ } }
-    els.voiceStatus.textContent = 'Get ready. Speak when you hear the beep.';
+    els.voiceStatus.textContent = 'Speak after the beep.';
     await sleep(900);
     if (!S.analyser) return;
     S.testBuf = [];
-    await countdown(T.quietSec, 'Get ready');   /* the room noise is measured here, before the beep */
+    await countdown(T.quietSec, 'Waiting for the beep');   /* the room noise is measured here, before the beep */
     const quiet = S.testBuf || [];
     if (!S.analyser) return;
     beep(880, 0.2);
@@ -1120,7 +1120,7 @@ function analyseVoice(quiet, speech) {
   const q = quiet.map((f) => f.db).sort((a, b) => a - b);
   const s = speech.map((f) => f.db).sort((a, b) => a - b);
   const sp = speech.map((f) => f.pdb).sort((a, b) => a - b);
-  const noise = Math.min(pct(q, 0.5), pct(s, 0.1));   /* lead-in before the beep, or the quietest moments of the speech */
+  const noise = Math.min(pct(q, 0.5), pct(s, 0.1));   /* lead-in before the beep, or the quietest moments of the recording (usually the silence after you stop speaking) */
   const level = pct(s, 0.9);        /* average loudness (RMS), compared against room noise */
   const peakLevel = pct(sp, 0.9);   /* typical peak, like a recording meter */
   const peak = Math.max(...speech.map((f) => f.peak));
