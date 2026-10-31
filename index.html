@@ -208,8 +208,7 @@
       <p id="checkResult" tabindex="-1"></p>
       <p id="voiceStatus" class="small"></p>
       <p id="voiceResult" tabindex="-1"></p>
-      <p class="small" id="voiceHelp">Press Test my voice, then speak after the beep.</p>
-      <p class="small" id="keysHint">Shortcut keys: S start or stop, C check my picture now, V voice test, L live voice feedback on or off, D describe my setup. Details are in Help.</p>
+      <p class="small"><span id="voiceHelp">Press Test my voice, then speak after the beep.</span> <span id="keysHint">Shortcut keys: S start or stop, C check my picture now, V voice test, L live voice feedback on or off, D describe my setup. Details are in Help.</span></p>
       <div class="selects">
         <div class="field">
           <label for="camSel">Camera</label>
@@ -223,8 +222,7 @@
     </section>
 
     <div class="grid">
-      <section class="panel" aria-labelledby="preview-h">
-        <h2 id="preview-h">Preview</h2>
+      <section class="panel" id="previewPanel" aria-hidden="true">
         <p id="coach" class="coach">Press Start to begin.</p>
         <div class="stage" id="stage">
           <div class="stage-inner mirror" id="stageInner" hidden>
@@ -233,11 +231,11 @@
           </div>
           <p class="placeholder" id="placeholder">The camera preview appears here after you press Start.</p>
         </div>
-        <p class="small" style="margin:.75rem 0 0">Left and right advice is from your point of view, as you sit in front of the camera.</p>
       </section>
 
       <section class="panel" aria-labelledby="picture-h">
         <h2 id="picture-h">Picture</h2>
+        <p class="small" style="margin:0 0 .5rem">Left and right are from your point of view.</p>
         <ul class="checks" id="pictureList"></ul>
       </section>
     </div>
@@ -246,7 +244,7 @@
       <h2 id="sound-h">Sound</h2>
       <div class="sound-grid">
         <div>
-          <div class="meter-label"><span>Microphone peak level now</span><span id="meterValue" class="num">Off</span></div>
+          <div class="meter-label"><span aria-hidden="true">Microphone peak level now</span><span id="meterValue" class="num" aria-hidden="true">Off</span><span id="meterSr" class="vh">Microphone peak level now: Off</span></div>
           <div class="meter" id="meter" aria-hidden="true"><div class="meter-cover" id="meterCover"></div></div>
           <div class="zones" id="zones" aria-hidden="true"><span id="zoneLow">Too quiet</span><span id="zoneGood">Good</span><span id="zoneHot">Too loud</span></div>
           <div class="control-row" style="margin-top:1rem">
@@ -410,7 +408,16 @@ function liveSay(text) {
     }, 80);
   });
 }
-if (!synth && !IOS) els.coach.setAttribute('aria-live', 'polite');
+if (!synth && !IOS) {
+  /* with no browser voice the coach line is the only live advice, so it must stay available */
+  const pp = document.getElementById('previewPanel');
+  if (pp) pp.removeAttribute('aria-hidden');
+  els.coach.setAttribute('aria-live', 'polite');
+}
+(() => {
+  const mv = document.getElementById('meterValue'), ms = document.getElementById('meterSr');
+  if (mv && ms) new MutationObserver(() => { ms.textContent = 'Microphone peak level now: ' + mv.textContent; }).observe(mv, { childList: true, characterData: true, subtree: true });
+})();
 
 /* Safari only allows speech after a click or key press, so every button that can lead to
    speech calls this first, inside its own click handler. */
