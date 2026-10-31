@@ -481,9 +481,16 @@ function buildRows(list, defs) {
     msg.className = 'check-text';
     msg.textContent = 'Press Start to check this.';
     head.append(n, colon, pill, stop);
-    li.append(head, msg);
+    /* A screen reader should meet each row as one item, so the sighted layout is hidden from it and
+       one plain sentence is offered instead. */
+    head.setAttribute('aria-hidden', 'true');
+    msg.setAttribute('aria-hidden', 'true');
+    const sr = document.createElement('span');
+    sr.className = 'vh';
+    li.append(sr, head, msg);
     list.appendChild(li);
-    rowEls[id] = { li, pill, msg, state: 'unknown', text: msg.textContent };
+    rowEls[id] = { li, pill, msg, sr, name, state: 'unknown', text: msg.textContent };
+    sr.textContent = name + ': ' + STATE_LABEL.unknown + '. ' + msg.textContent;
   }
 }
 buildRows(els.pictureList, PICTURE_ROWS);
@@ -497,6 +504,7 @@ function setRow(id, state, text) {
   r.li.dataset.state = state;
   r.pill.textContent = STATE_LABEL[state] || state;
   r.msg.textContent = text;
+  r.sr.textContent = r.name + ': ' + (STATE_LABEL[state] || state) + '. ' + text;
 }
 
 /* ---------- Errors ---------- */
@@ -1419,7 +1427,7 @@ function toggleLive() {
   S.paused = !S.paused;
   els.pause.textContent = S.paused ? 'Start live voice feedback' : 'Stop live voice feedback';
   if (!S.paused) S.announce = { cand: null, count: 0, spoken: null, spokenId: null, at: 0 };
-  say(S.paused ? 'Live voice feedback is off. Press Check my picture now whenever you want advice.' : 'Live voice feedback is on. I will speak adjustments as you move.');
+  say(S.paused ? 'Live feedback off.' : 'Live feedback on.');
 }
 els.pause.addEventListener('click', toggleLive);
 els.checkBtn.addEventListener('click', checkNow);
