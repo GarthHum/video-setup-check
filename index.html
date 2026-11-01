@@ -186,50 +186,43 @@
 </head>
 <body>
 <a class="skip" href="#picture-h">Skip to results</a>
-<noscript><p>This page needs JavaScript to check your camera and microphone.</p></noscript>
+<noscript><p>This page needs JavaScript to check your camera.</p></noscript>
 
 <div class="wrap">
   <header>
     <h1>Check My Camera</h1>
-    <p class="lede">Check your framing, lighting and microphone before you record or join a call. Everything runs in your browser. Nothing is saved or uploaded. The Help section explains exactly what happens to your video and audio.</p>
+    <p class="lede">Check your framing and lighting before you record or join a call. Everything runs in your browser. Nothing is saved or uploaded. The Help section explains exactly what happens to your video and audio.</p>
   </header>
 
   <main id="main" style="display:grid; gap:1rem;">
     <section class="panel" aria-labelledby="controls-h">
-      <h2 id="controls-h">Camera and microphone</h2>
+      <h2 id="controls-h">Camera</h2>
       <div class="control-row">
-        <button type="button" id="startBtn" class="btn" aria-keyshortcuts="S">Start camera and microphone</button>
+        <button type="button" id="startBtn" class="btn" aria-keyshortcuts="S">Start camera</button>
         <button type="button" id="checkBtn" class="btn secondary" aria-keyshortcuts="C" disabled>Check my picture now</button>
         <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="L">Start live voice feedback</button>
-        <button type="button" id="voiceBtn" class="btn secondary" aria-keyshortcuts="V" disabled>Test my voice</button>
         <button type="button" id="describeBtn" class="btn secondary" aria-keyshortcuts="D" disabled>Describe my setup</button>
       </div>
       <div id="errorBox" class="notice" role="alert" hidden></div>
       <p id="checkResult" tabindex="-1"></p>
-      <p id="voiceStatus" class="small"></p>
-      <p id="voiceResult" tabindex="-1"></p>
-      <p class="small"><span id="voiceHelp">Press Test my voice, then speak after the beep.</span> <span id="keysHint">Shortcut keys: S start or stop, C check my picture now, V voice test, L live voice feedback on or off, D describe my setup. Details are in Help.</span></p>
+      <p class="small" id="keysHint">Shortcut keys: S start or stop, C check my picture now, L live voice feedback on or off, D describe my setup. Details are in Help.</p>
       <div class="selects">
         <div class="field">
           <label for="camSel">Camera</label>
           <select id="camSel" disabled><option>Press Start first</option></select>
         </div>
-        <div class="field">
-          <label for="micSel">Microphone</label>
-          <select id="micSel" disabled><option>Press Start first</option></select>
-        </div>
       </div>
     </section>
 
     <div class="grid">
-      <section class="panel" id="previewPanel" aria-hidden="true">
+      <section class="panel" id="previewPanel" aria-hidden="true" hidden>
         <p id="coach" class="coach">Press Start to begin.</p>
         <div class="stage" id="stage">
           <div class="stage-inner mirror" id="stageInner" hidden>
             <video id="video" autoplay muted playsinline aria-label="Live camera preview. Results are listed in the sections beside and below."></video>
             <canvas id="overlay" aria-hidden="true"></canvas>
           </div>
-          <p class="placeholder" id="placeholder">The camera preview appears here after you press Start.</p>
+          <p class="placeholder" id="placeholder" hidden></p>
         </div>
       </section>
 
@@ -240,8 +233,21 @@
       </section>
     </div>
 
-    <section class="panel" aria-labelledby="sound-h">
-      <h2 id="sound-h">Sound</h2>
+    <details class="panel" id="advanced">
+      <summary>Advanced: microphone test (experimental)</summary>
+      <p class="small">Experimental. Levels measured by a browser can read lower than a recording app or video call shows. On an iPhone, using the microphone may stop VoiceOver speaking until you switch it off and on again.</p>
+      <div class="selects">
+        <div class="field">
+          <label for="micSel">Microphone</label>
+          <select id="micSel" disabled><option>Default microphone</option></select>
+        </div>
+      </div>
+      <div class="control-row">
+        <button type="button" id="voiceBtn" class="btn secondary" aria-keyshortcuts="V">Test my voice</button>
+      </div>
+      <p class="small" id="voiceHelp">Press Test my voice, then speak after the beep. Shortcut key: V.</p>
+      <p id="voiceStatus" class="small"></p>
+      <p id="voiceResult" tabindex="-1"></p>
       <div class="sound-grid">
         <div>
           <div class="meter-label"><span aria-hidden="true">Microphone peak level now</span><span id="meterValue" class="num" aria-hidden="true">Off</span><span id="meterSr" class="vh">Microphone peak level now: Off</span></div>
@@ -253,7 +259,7 @@
         </div>
         <ul class="checks" id="soundList"></ul>
       </div>
-    </section>
+    </details>
 
     <section class="panel" id="reportPanel" aria-labelledby="report-h" hidden>
       <h2 id="report-h">Setup summary</h2>
@@ -348,7 +354,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   start: $('startBtn'), describe: $('describeBtn'), error: $('errorBox'),
   camSel: $('camSel'), micSel: $('micSel'),
-  coach: $('coach'), stage: $('stage'), stageInner: $('stageInner'), video: $('video'), overlay: $('overlay'), placeholder: $('placeholder'),
+  previewPanel: $('previewPanel'), coach: $('coach'), stage: $('stage'), stageInner: $('stageInner'), video: $('video'), overlay: $('overlay'), placeholder: $('placeholder'),
   pictureList: $('pictureList'), soundList: $('soundList'),
   meter: $('meter'), meterCover: $('meterCover'), meterValue: $('meterValue'),
   zoneLow: $('zoneLow'), zoneGood: $('zoneGood'), zoneHot: $('zoneHot'),
@@ -387,7 +393,7 @@ const S = {
 /* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
    passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const ON_DEMAND_MIC = IOS;   /* on iPhone the microphone is opened only while the voice test runs */
+const ON_DEMAND_MIC = true;   /* on iPhone the microphone is opened only while the voice test runs */
 const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
 const liveRegion = document.createElement('div');
@@ -542,15 +548,8 @@ function explainError(e) {
 async function openMedia(camId, micId, retried) {
   const video = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
   if (camId) video.deviceId = { exact: camId };
-  const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
-  if (micId) audio.deviceId = { exact: micId };
-  const attempts = [
-    { video, audio, kind: 'both' },
-    { video, audio: false, kind: 'video' },
-    { video: false, audio, kind: 'audio' },
-  ];
+  const attempts = [{ video, audio: false, kind: 'video' }];
   let firstErr = null;
-  sessionToCapture();
   for (const a of attempts) {
     for (let go = 0; go < 2; go++) {
       try {
@@ -657,21 +656,18 @@ async function attach({ stream, kind, err }) {
     els.placeholder.hidden = true;
   } else {
     els.stageInner.hidden = true;
-    els.placeholder.hidden = false;
-    els.placeholder.textContent = 'No camera is running. Microphone checks are still available.';
+    els.placeholder.hidden = true;
   }
   if (S.audioTrack) setupAudio(S.audioTrack);
 
   await refreshDevices();
   if (navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
 
-  if (kind === 'video') showNotice('The microphone could not be started: ' + explainError(err) + ' Camera checks still work.', 'warn');
-  if (kind === 'audio') showNotice('The camera could not be started: ' + explainError(err) + ' Microphone checks still work.', 'warn');
 
-  els.start.textContent = 'Stop camera and microphone';
+  els.start.textContent = 'Stop camera';
+  els.previewPanel.hidden = false;
   els.describe.disabled = false;
   els.checkBtn.disabled = !S.videoTrack;
-  els.voiceBtn.disabled = !(S.analyser || (ON_DEMAND_MIC && S.stream));
   S.timers.evaluate = setInterval(evaluateAndRender, CFG.evaluateEveryMs);
   if (S.videoTrack) {
     S.timers.detect = setInterval(tick, CFG.detectEveryMs);
@@ -679,9 +675,7 @@ async function attach({ stream, kind, err }) {
   }
   evaluateAndRender();
   renderSound();
-  say(!S.videoTrack
-    ? 'Microphone is on. Use Test my voice to check your sound.'
-    : (ON_DEMAND_MIC ? 'Camera is on. The microphone stays off until you press Test my voice. ' : 'Camera and microphone are on. ') + 'Press Check my picture now for advice, or Start live voice feedback to hear advice as you move.');
+  say('Camera is on.');
 }
 
 function onTrackEnded() {
@@ -726,6 +720,7 @@ function releaseAudio() {
 async function openMic() {
   const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
   sessionToCapture();
+  if (els.micSel && !els.micSel.disabled && els.micSel.value) audio.deviceId = { exact: els.micSel.value };
   const stream = await navigator.mediaDevices.getUserMedia({ audio });
   S.audioTrack = stream.getAudioTracks()[0] || null;
   if (!S.audioTrack) throw new Error('No microphone track');
@@ -754,24 +749,23 @@ function stop() {
   const wasRunning = !!S.stream;
   stopStream();
   resetUi();
-  if (wasRunning) say('Camera and microphone are off.');
+  if (wasRunning) say('Camera is off.');
 }
 
 function resetUi() {
-  els.start.textContent = 'Start camera and microphone';
+  els.start.textContent = 'Start camera';
+  els.previewPanel.hidden = true;
   els.start.disabled = false;
   els.describe.disabled = true;
   els.checkBtn.disabled = true;
   els.checkResult.textContent = '';
-  els.voiceBtn.disabled = true;
+  els.voiceBtn.disabled = false;
   els.voiceStatus.textContent = '';
   els.voiceResult.textContent = '';
   els.playBtn.disabled = true;
   els.stageInner.hidden = true;
-  els.placeholder.hidden = false;
-  els.placeholder.textContent = 'The camera preview appears here after you press Start.';
+  els.placeholder.hidden = true;
   els.camSel.disabled = true;
-  els.micSel.disabled = true;
   els.coach.textContent = 'Press Start to begin.';
   els.meterValue.textContent = 'Off';
   els.meterCover.style.left = '0%';
@@ -1078,7 +1072,6 @@ function playClip() {
 async function runVoiceTest() {
   if (S.testing) return;
   if (!S.analyser) {
-    if (!(ON_DEMAND_MIC && S.stream)) return;
     els.voiceStatus.textContent = 'Turning on the microphone…';
     try { await openMic(); } catch (e) { els.voiceStatus.textContent = 'The microphone could not be started. ' + explainError(e); return; }
   }
@@ -1139,7 +1132,7 @@ async function runVoiceTest() {
     els.voiceBtn.removeAttribute('aria-disabled');
     els.voiceBtn.textContent = 'Test my voice';
     if (ON_DEMAND_MIC && S.analyser) releaseAudio();
-    els.voiceBtn.disabled = !(S.analyser || (ON_DEMAND_MIC && S.stream));
+    els.voiceBtn.disabled = false;
     if (ON_DEMAND_MIC) renderSound();
   }
 }
@@ -1163,8 +1156,7 @@ function evaluateSound() {
   const out = [];
   const push = (id, state, text) => out.push({ id, state, text });
   if (!S.analyser && !S.voice) {
-    const none = !S.stream ? 'Press Start to check this.' : (ON_DEMAND_MIC ? 'Run the voice test to check this.' : 'No microphone is running.');
-    for (const [id] of SOUND_ROWS) push(id, ON_DEMAND_MIC && S.stream ? 'untested' : 'unknown', none);
+    for (const [id] of SOUND_ROWS) push(id, 'untested', 'Run the voice test to check this.');
     return out;
   }
   const v = S.voice;
@@ -1388,19 +1380,19 @@ function buildReport() {
     p1.textContent = parts.join(' ');
   }
 
-  if (!S.analyser && !S.voice && !ON_DEMAND_MIC) p2.textContent = 'Sound. No microphone is running.';
-  else if (!S.voice) p2.textContent = 'Sound. The voice test has not been run yet. Choose Test my voice.';
+  if (!S.voice) p2.textContent = '';
   else p2.textContent = 'Sound. ' + snd.map((r) => r.text).join(' ');
   return [p1, p2];
 }
 function rowName(id) { const d = PICTURE_ROWS.find((r) => r[0] === id); return d ? d[1] : id; }
 
 function describeSetup() {
-  if (!S.stream) { showCheck('The camera and microphone are not running. Press Start first.'); return; }
+  if (!S.stream) { showCheck('The camera is not running. Press Start first.'); return; }
   const [p1, p2] = buildReport();
   const p = document.createElement('p');
   p.tabIndex = -1;
-  p.append(p1.textContent, document.createElement('br'), p2.textContent);
+  p.append(p1.textContent);
+  if (p2.textContent) p.append(document.createElement('br'), p2.textContent);
   els.report.replaceChildren(p);
   els.reportPanel.hidden = false;
   S.announce.at = Date.now() + 6000;
@@ -1456,12 +1448,11 @@ document.addEventListener('keydown', (e) => {
     case 'KeyL': case 'KeyM': e.preventDefault(); toggleLive(); break;
     case 'KeyC': case 'KeyN': e.preventDefault(); if (!busy()) checkNow(); break;
     case 'KeyD': e.preventDefault(); if (!busy()) { unlockSpeech(); describeSetup(); } break;
-    case 'KeyV': e.preventDefault(); if (S.analyser || (ON_DEMAND_MIC && S.stream)) runVoiceTest(); else { unlockSpeech(); say('Press S to start the microphone first.'); } break;
+    case 'KeyV': e.preventDefault(); unlockSpeech(); { const ad = document.getElementById('advanced'); if (ad) ad.open = true; } runVoiceTest(); break;
     default: break;
   }
 });
 els.camSel.addEventListener('change', () => { if (S.stream) start(); });
-els.micSel.addEventListener('change', () => { if (S.stream) start(); });
 window.addEventListener('pagehide', () => {
   stopStream();
   if (synth) { try { synth.cancel(); } catch (e) { /* ignore */ } }
