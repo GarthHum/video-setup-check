@@ -214,6 +214,11 @@
       </div>
     </section>
 
+    <section class="panel" id="reportPanel" aria-labelledby="report-h" hidden>
+      <h2 id="report-h">Setup summary</h2>
+      <div id="report"></div>
+    </section>
+
     <div class="grid">
       <section class="panel" id="previewPanel" aria-hidden="true" hidden>
         <p id="coach" class="coach">Press Start to begin.</p>
@@ -233,7 +238,7 @@
       </section>
     </div>
 
-    <details class="panel" id="advanced">
+    <details class="panel" id="advanced" hidden>
       <summary>Advanced: microphone test (experimental)</summary>
       <p class="small">Experimental. Levels measured by a browser can read lower than a recording app or video call shows. On an iPhone, using the microphone may stop VoiceOver speaking until you switch it off and on again.</p>
       <div class="selects">
@@ -261,17 +266,13 @@
       </div>
     </details>
 
-    <section class="panel" id="reportPanel" aria-labelledby="report-h" hidden>
-      <h2 id="report-h">Setup summary</h2>
-      <div id="report"></div>
-    </section>
 
     <section class="panel" aria-labelledby="help-h">
       <h2 id="help-h">Help</h2>
       <details>
         <summary>What happens to my video and audio?</summary>
-        <p>Your video and audio are not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The microphone is used to measure how loud you are. During the voice test only (the only time the microphone is used on an iPhone or iPad), the six seconds of your voice are also held in your browser's memory so the page can play them back to you. That sound stays on your computer, and it is discarded when you run the test again, stop the camera and microphone, or leave the page.</p>
-        <p>Nothing is saved to your computer. Everything exists only in your browser's memory while the page is open. Choosing Stop camera and microphone, closing the tab, or leaving the page turns the camera and microphone off and clears it all.</p>
+        <p>Your video is not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The page does not use your microphone.</p>
+        <p>Nothing is saved to your computer. Everything exists only in your browser's memory while the page is open. Choosing Stop camera, closing the tab, or leaving the page turns the camera off and clears it all.</p>
         <p>This page saves nothing on your computer: no video, audio, results or settings. It sets no cookies, has no accounts and has no analytics.</p>
         <p>Some things are downloaded to your browser. The first time the face detector runs, your browser downloads its program code from the jsDelivr code delivery service and its small face model file from Google's servers. These are downloads to your computer and do not include your video. As with any website, the servers that provide the page and those files can see ordinary visit details such as your internet address and browser type. The page itself is hosted on GitHub Pages.</p>
         <p>Voice feedback uses the speech built into your browser. The words spoken are short advice messages made by this page, never your video or audio. Some browsers use online voices, and if yours does, the spoken words may be sent to the voice provider.</p>
@@ -279,32 +280,30 @@
       </details>
       <details>
         <summary>The browser did not ask for permission, or says access is blocked</summary>
-        <p>Choose the camera or padlock icon in the browser address bar, allow the camera and microphone for this site, then press Start again.</p>
-        <p><strong>Mac:</strong> open System Settings, then Privacy and Security, then Camera and Microphone, and turn on your browser.</p>
-        <p><strong>Windows:</strong> open Settings, then Privacy and security, then Camera and Microphone, and make sure access is on for apps and for your browser.</p>
+        <p>Choose the camera or padlock icon in the browser address bar, allow the camera for this site, then press Start again.</p>
+        <p><strong>Mac:</strong> open System Settings, then Privacy and Security, then Camera, and turn on your browser.</p>
+        <p><strong>Windows:</strong> open Settings, then Privacy and security, then Camera, and make sure access is on for apps and for your browser.</p>
         <p>If the camera is busy, close other apps that may be using it, such as video call apps or recording software.</p>
       </details>
       <details>
         <summary>How the checks work</summary>
         <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Distance compares the height of your face with the shorter side of the picture, so it works the same whether the picture is wide, like a laptop camera, or tall, like a phone held upright. Facing the camera compares the position of your nose with your eyes, so it measures which way your head is turned, not where your eyes are looking. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
-        <p>The microphone meter and voice test turn off echo cancellation, noise suppression and automatic gain, so the numbers reflect what a recording app would capture. Video call apps often boost a quiet microphone automatically, so this page can read lower than they do. Levels are peak levels in decibels relative to full scale, like the meters in recording software. Zero is the point where the sound distorts, and speech that peaks between about minus 30 and minus 6 is fine. A little below that is often still usable, so trust the playback too. Your average level reads lower than the peaks, usually by 10 decibels or more.</p>
         <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
       </details>
       <details>
         <summary>Voice feedback</summary>
         <p>There are two ways to get advice on your picture. Press Check my picture now, or the C key, and the advice appears as text just below the buttons, with your screen reader moved onto it so it reads it out. Nothing is spoken by the page for this. Or press Start live voice feedback, or the L key, and the page speaks each adjustment as you move, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Stop live voice feedback turns it off again. Live voice feedback is off until you turn it on.</p>
-        <p>Describe my setup works the same way as Check my picture now: the whole summary of picture and sound appears as text and your screen reader is moved onto it. The voice test works like this too.</p>
-        <p>On an iPhone or iPad the microphone is switched on only while the voice test runs, and switched off again when it finishes, because Safari on iOS can stay in recording mode and silence VoiceOver after the microphone has been used. Live voice feedback is read by VoiceOver instead of the browser voice, because Safari on iOS silences the browser voice while the microphone is open. Turn VoiceOver on to hear it. On a computer the live voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your volume is up.</p>
+        <p>Describe my setup works the same way as Check my picture now: the summary of your picture appears as text and your screen reader is moved onto it.</p>
+        <p>On an iPhone or iPad, live voice feedback is read by VoiceOver instead of the browser voice, so turn VoiceOver on to hear it. On a computer the live voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your volume is up.</p>
       </details>
       <details>
         <summary>Shortcut keys</summary>
-        <p>These keys work anywhere on the page, except while a Camera or Microphone list has focus.</p>
+        <p>These keys work anywhere on the page, except while the Camera list has focus.</p>
         <ul>
-          <li>S starts or stops the camera and microphone.</li>
+          <li>S starts or stops the camera.</li>
           <li>C checks your picture now. The advice appears as text and your screen reader is moved onto it. N does the same.</li>
           <li>L turns live voice feedback on or off. M does the same.</li>
-          <li>D describes your whole setup, picture and sound, as text.</li>
-          <li>V runs the voice test.</li>
+          <li>D describes your setup as text.</li>
         </ul>
         <p>Screen readers can capture plain letter keys. VoiceOver on a Mac passes them through unless Quick Nav is on. NVDA and JAWS in browse mode usually keep them for their own navigation, so switch to focus mode, or use the second set: hold Alt and Shift together and press the same letter, for example Alt plus Shift plus C. On a Mac that is Option plus Shift plus C. The buttons at the top of the page always work too, and they sit right after the Start button. Phones and tablets have no keyboard shortcuts, so use the buttons.</p>
       </details>
@@ -393,7 +392,8 @@ const S = {
 /* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
    passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const ON_DEMAND_MIC = true;   /* on iPhone the microphone is opened only while the voice test runs */
+const ON_DEMAND_MIC = true;
+const ADVANCED_MIC = false;   /* the microphone test is switched off for now; set true and remove the hidden attribute on #advanced to bring it back */   /* on iPhone the microphone is opened only while the voice test runs */
 const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
 const liveRegion = document.createElement('div');
@@ -675,7 +675,7 @@ async function attach({ stream, kind, err }) {
   }
   evaluateAndRender();
   renderSound();
-  say('Camera is on.');
+
 }
 
 function onTrackEnded() {
@@ -749,7 +749,7 @@ function stop() {
   const wasRunning = !!S.stream;
   stopStream();
   resetUi();
-  if (wasRunning) say('Camera is off.');
+
 }
 
 function resetUi() {
@@ -1448,7 +1448,7 @@ document.addEventListener('keydown', (e) => {
     case 'KeyL': case 'KeyM': e.preventDefault(); toggleLive(); break;
     case 'KeyC': case 'KeyN': e.preventDefault(); if (!busy()) checkNow(); break;
     case 'KeyD': e.preventDefault(); if (!busy()) { unlockSpeech(); describeSetup(); } break;
-    case 'KeyV': e.preventDefault(); unlockSpeech(); { const ad = document.getElementById('advanced'); if (ad) ad.open = true; } runVoiceTest(); break;
+    case 'KeyV': if (!ADVANCED_MIC) break; e.preventDefault(); unlockSpeech(); { const ad = document.getElementById('advanced'); if (ad) ad.open = true; } runVoiceTest(); break;
     default: break;
   }
 });
