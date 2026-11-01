@@ -337,6 +337,9 @@ const CFG = {
   bottomMax: 0.92,
   tiltMaxDeg: 10,
   yawOk: 0.2, yawFar: 0.4,
+  /* Up or down: where the nose tip sits between the eyes and the mouth, 0 at the eyes and 1 at the mouth.
+     Roughly 0.6 when the head is level. Lower means the chin is raised, higher means it is lowered. */
+  pitchLo: 0.45, pitchHi: 0.78,
   faceDark: 50,               // 0 to 255 brightness
   faceBright: 205,
   frameDark: 40,
@@ -465,7 +468,7 @@ function say(text, opts) {
 /* ---------- Rows ---------- */
 const PICTURE_ROWS = [
   ['camera', 'Camera'], ['face', 'Face'], ['center', 'Centering'], ['height', 'Height in frame'],
-  ['distance', 'Distance'], ['facing', 'Facing the camera'], ['tilt', 'Tilt'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'],
+  ['distance', 'Distance'], ['facing', 'Facing the camera'], ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'],
 ];
 const SOUND_ROWS = [['voice', 'Speaking level'], ['noise', 'Background noise'], ['clip', 'Distortion']];
 const STATE_LABEL = { good: 'Good', adjust: 'Adjust', unknown: 'Unknown', untested: 'Not tested' };
@@ -823,13 +826,14 @@ async function detectFaces() {
         x: b.originX / W, y: b.originY / H, w: b.width / W, h: b.height / H,
         eyes: k.length >= 2 ? { r: k[0], l: k[1] } : null,
         nose: k.length >= 3 ? k[2] : null,
+        mouth: k.length >= 4 ? k[3] : null,
       };
     });
   }
   const found = await S.detector.detect(v);
   return found.map((f) => {
     const b = f.boundingBox;
-    return { x: b.x / W, y: b.y / H, w: b.width / W, h: b.height / H, eyes: null, nose: null };
+    return { x: b.x / W, y: b.y / H, w: b.width / W, h: b.height / H, eyes: null, nose: null, mouth: null };
   });
 }
 
@@ -856,11 +860,22 @@ function pickFace(faces) {
     const eyeDist = Math.abs(f.eyes.l.x - f.eyes.r.x);
     if (eyeDist > 0.005) yaw = (f.nose.x - (f.eyes.l.x + f.eyes.r.x) / 2) / eyeDist;
   }
+  /* Up or down: the nose tip's position along the line from the eyes to the mouth. Measured along that
+     line, so a tilted head does not disturb it. A raised chin moves the nose tip toward the eyes. */
+  let pitch = NaN;
+  if (f.eyes && f.nose && f.mouth) {
+    const W = els.video.videoWidth || 1, H = els.video.videoHeight || 1;
+    const ex = (f.eyes.l.x + f.eyes.r.x) / 2 * W, ey = (f.eyes.l.y + f.eyes.r.y) / 2 * H;
+    const mx = f.mouth.x * W - ex, my = f.mouth.y * H - ey;
+    const nx = f.nose.x * W - ex, ny = f.nose.y * H - ey;
+    const len2 = mx * mx + my * my;
+    if (len2 > 4) pitch = (nx * mx + ny * my) / len2;
+  }
   /* Face size is measured against the shorter side of the picture. A phone held upright gives a tall
      picture, and measuring against its height would wrongly make a normal arm's-length face look small. */
   const vw = els.video.videoWidth || 1, vh = els.video.videoHeight || 1;
   const size = f.h * vh / Math.min(vw, vh);
-  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, size, tilt, yaw, count: faces.length };
+  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, size, tilt, yaw, pitch, count: faces.length };
 }
 
 const SC = document.createElement('canvas');
@@ -1206,6 +1221,7 @@ function currentFace() {
     cx: m((s) => s.face.cx), top: m((s) => s.face.top), bottom: m((s) => s.face.bottom), h: m((s) => s.face.h), size: m((s) => s.face.size),
     tilt: num((s) => s.face.tilt),
     yaw: num((s) => s.face.yaw),
+    pitch: num((s) => s.face.pitch),
     lFace: num((s) => s.luma.face), lLeft: num((s) => s.luma.imgLeft), lRight: num((s) => s.luma.imgRight), lBg: num((s) => s.luma.bg),
   };
 }
@@ -1231,7 +1247,7 @@ function evaluatePicture() {
   }
 
   const f = currentFace();
-  const faceDeps = ['center', 'height', 'distance', 'facing', 'tilt'];
+  const faceDeps = ['center', 'height', 'distance', 'facing', 'tilt', 'pitch'];
   if (S.detectorState === 'idle' || S.detectorState === 'loading') {
     push('face', 'unknown', 'Loading the face detector. This can take a few seconds the first time.', 99);
     wait(faceDeps, 'Waiting for the face detector.');
@@ -1285,6 +1301,12 @@ function evaluatePicture() {
       push('tilt', 'adjust', 'Your head is tilted about ' + Math.round(Math.abs(f.tilt)) + ' degrees toward your ' + low + ' shoulder. Tilt your head a little toward your ' + fix + ' shoulder, or level the camera.', 5, 'tilt:' + low);
     }
     else push('tilt', 'good', 'Your head and the camera look level.', 5);
+
+    const dbg = /debug/.test(location.hash) && Number.isFinite(f.pitch) ? ' (measure ' + f.pitch.toFixed(2) + ')' : '';
+    if (!Number.isFinite(f.pitch)) push('pitch', 'unknown', 'Looking up or down cannot be measured with this face detector.', 99);
+    else if (f.pitch < CFG.pitchLo) push('pitch', 'adjust', 'Your chin is raised, so you are looking above the camera. Lower your chin a little, or raise the camera.' + dbg, 3, 'pitch:up');
+    else if (f.pitch > CFG.pitchHi) push('pitch', 'adjust', 'Your head is angled down, so you are looking below the camera. Lift your chin a little, or lower the camera.' + dbg, 3, 'pitch:down');
+    else push('pitch', 'good', 'You are looking straight at the camera, not above or below it.' + dbg, 3);
   }
 
   const lumas = S.samples.slice(-CFG.window).map((s) => (s.luma ? s.luma.frame : NaN)).filter(Number.isFinite);
