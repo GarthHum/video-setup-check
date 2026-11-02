@@ -178,6 +178,13 @@
   summary { cursor: pointer; font-weight: 650; padding: .25rem 0; }
   details p { margin: .5rem 0 0; max-width: 46rem; }
 
+  #settings fieldset { border: 1px solid var(--line); border-radius: .5rem; margin: 1rem 0; padding: .75rem 1rem; }
+  #settings legend { font-weight: 650; padding: 0 .4rem; }
+  #settings .opt { display: block; margin: .35rem 0; }
+  #settings .numrow { margin: .9rem 0; }
+  #settings .numrow label { display: block; font-weight: 650; }
+  #settings .numrow input { width: 7rem; font: inherit; padding: .3rem .5rem; margin: .25rem 0; }
+  #settings .numrow .small { margin: 0; }
   @media (prefers-reduced-motion: reduce) { .meter-cover { transition: none; } }
   @media (forced-colors: active) {
     .pill, .panel, .meter { border: 1px solid CanvasText; }
@@ -266,6 +273,27 @@
       </div>
     </details>
 
+
+    <details class="panel" id="settings">
+      <summary>Advanced settings</summary>
+      <p class="small">These change how strict the picture checks are. They apply straight away and are not saved, so they reset when you leave the page.</p>
+      <div class="field" style="max-width:20rem">
+        <label for="preset">Strictness</label>
+        <select id="preset">
+          <option value="relaxed">Relaxed</option>
+          <option value="balanced" selected>Balanced</option>
+          <option value="picky">Picky</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <fieldset id="feedbackTypes"><legend>Give feedback on</legend></fieldset>
+      <div class="control-row">
+        <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
+        <button type="button" id="resetBtn" class="btn secondary">Reset to Balanced</button>
+      </div>
+      <p id="settingsStatus" class="small" role="status"></p>
+      <div id="settingsFields"></div>
+    </details>
 
     <section class="panel" aria-labelledby="help-h">
       <h2 id="help-h">Help</h2>
@@ -1226,7 +1254,9 @@ function currentFace() {
   };
 }
 
-function evaluatePicture() {
+const OFF = {};   /* feedback types switched off in Advanced settings */
+function evaluatePicture() { return evaluatePictureAll().filter((r) => !OFF[r.id]); }
+function evaluatePictureAll() {
   const out = [];
   const push = (id, state, text, pri, key) => out.push({ id, state, text, pri, key: key || id });
   const wait = (ids, text) => ids.forEach((id) => push(id, 'unknown', text, 99));
@@ -1453,6 +1483,89 @@ document.getElementById('skipLink').addEventListener('click', (e) => {
   els.start.focus();
   setTimeout(() => els.start.focus(), 50);   /* some screen readers move focus again just after the link is activated */
 });
+/* ---------- Advanced settings ---------- */
+const PRESETS = {
+  balanced: null,   /* filled from the defaults below */
+  relaxed: {
+    centerTolerance: 0.105, centerFar: 0.24, yawOk: 0.3, yawFar: 0.6, tiltMaxDeg: 15, pitchLo: 0.38, pitchHi: 0.68,
+    faceMin: 0.17, faceMax: 0.58, topEdgeMin: 0.03, bottomMax: 0.96, lowGap: 0.35,
+  },
+  picky: {
+    centerTolerance: 0.04, centerFar: 0.10, yawOk: 0.12, yawFar: 0.25, tiltMaxDeg: 6, pitchLo: 0.47, pitchHi: 0.59,
+    faceMin: 0.26, faceMax: 0.44, topEdgeMin: 0.08, bottomMax: 0.9, lowGap: 0.15,
+  },
+};
+const SETTING_DEFS = [
+  { key: 'centerTolerance', label: 'Position left and right, allowed distance from the middle', unit: 'percent of the picture width', scale: 100, step: 1, help: 'Beyond this the page says to move left or right.' },
+  { key: 'centerFar', label: 'Position left and right, far from the middle', unit: 'percent of the picture width', scale: 100, step: 1, help: 'Beyond this the advice is stronger.' },
+  { key: 'yawOk', label: 'Facing the camera, allowed turn', unit: 'measure', scale: 1, step: 0.05, help: 'How far your nose can sit to either side between your eyes. 0 is straight on and 0.2 is about 15 degrees.' },
+  { key: 'yawFar', label: 'Facing the camera, large turn', unit: 'measure', scale: 1, step: 0.05, help: 'Beyond this the advice is stronger.' },
+  { key: 'tiltMaxDeg', label: 'Tilt, allowed lean toward a shoulder', unit: 'degrees', scale: 1, step: 1, help: '' },
+  { key: 'pitchLo', label: 'Up or down, lowest level before looking above the camera', unit: 'measure', scale: 1, step: 0.01, help: 'A lower number is more forgiving. Use Set my up and down level to match your face and camera.' },
+  { key: 'pitchHi', label: 'Up or down, highest level before looking below the camera', unit: 'measure', scale: 1, step: 0.01, help: 'A higher number is more forgiving.' },
+  { key: 'faceMin', label: 'Distance, smallest face', unit: 'percent of the shorter picture side', scale: 100, step: 1, help: 'Smaller than this and the page says to move closer.' },
+  { key: 'faceMax', label: 'Distance, largest face', unit: 'percent of the shorter picture side', scale: 100, step: 1, help: 'Larger than this and the page says to move back.' },
+  { key: 'topEdgeMin', label: 'Height, space above the head at the top edge', unit: 'percent of the picture height', scale: 100, step: 1, help: 'Less than this and your head is touching the top.' },
+  { key: 'bottomMax', label: 'Height, lowest point for the chin', unit: 'percent of the way down', scale: 100, step: 1, help: 'Lower than this and your chin is near the bottom.' },
+  { key: 'lowGap', label: 'Height, extra empty space above compared with below', unit: 'percent of the picture height', scale: 100, step: 1, help: 'More than this and you sit low in the picture.' },
+];
+const getSetting = (k) => (k === 'faceMin' ? CFG.faceHeightGood[0] : k === 'faceMax' ? CFG.faceHeightGood[1] : CFG[k]);
+const putSetting = (k, v) => { if (k === 'faceMin') CFG.faceHeightGood[0] = v; else if (k === 'faceMax') CFG.faceHeightGood[1] = v; else CFG[k] = v; };
+PRESETS.balanced = Object.fromEntries(SETTING_DEFS.map((d) => [d.key, getSetting(d.key)]));
+const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Height in the picture'], ['distance', 'Distance'], ['facing', 'Facing the camera'],
+  ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you']];
+(() => {
+  const presetSel = document.getElementById('preset'), fields = document.getElementById('settingsFields');
+  const status = document.getElementById('settingsStatus'), box = document.getElementById('feedbackTypes');
+  const inputs = {};
+  const refresh = () => { for (const d of SETTING_DEFS) inputs[d.key].value = Math.round(getSetting(d.key) * d.scale * 100) / 100; };
+  for (const [id, name] of FEEDBACK_TYPES) {
+    const l = document.createElement('label'); l.className = 'opt';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true;
+    c.addEventListener('change', () => {
+      OFF[id] = !c.checked;
+      if (rowEls[id]) rowEls[id].li.hidden = !c.checked;
+      if (S.stream) evaluateAndRender();
+    });
+    l.append(c, ' ' + name);
+    box.appendChild(l);
+  }
+  for (const d of SETTING_DEFS) {
+    const row = document.createElement('div'); row.className = 'numrow';
+    const lab = document.createElement('label'); lab.htmlFor = 'set-' + d.key; lab.textContent = d.label + ' (' + d.unit + ')';
+    const inp = document.createElement('input'); inp.type = 'number'; inp.id = 'set-' + d.key; inp.step = d.step; inp.min = 0;
+    inputs[d.key] = inp;
+    inp.addEventListener('change', () => {
+      const v = parseFloat(inp.value);
+      if (Number.isFinite(v) && v >= 0) putSetting(d.key, v / d.scale);
+      refresh(); presetSel.value = 'custom'; status.textContent = 'Custom settings in use.';
+      if (S.stream) evaluateAndRender();
+    });
+    row.append(lab, inp);
+    if (d.help) { const h = document.createElement('p'); h.className = 'small'; h.id = 'set-help-' + d.key; h.textContent = d.help; inp.setAttribute('aria-describedby', h.id); row.appendChild(h); }
+    fields.appendChild(row);
+  }
+  const apply = (name) => {
+    for (const [k, v] of Object.entries(PRESETS[name])) putSetting(k, v);
+    refresh(); presetSel.value = name;
+    if (S.stream) evaluateAndRender();
+  };
+  presetSel.addEventListener('change', () => {
+    if (presetSel.value === 'custom') return;
+    apply(presetSel.value);
+    status.textContent = presetSel.options[presetSel.selectedIndex].text + ' settings in use.';
+  });
+  document.getElementById('resetBtn').addEventListener('click', () => { apply('balanced'); status.textContent = 'Reset to Balanced.'; });
+  document.getElementById('levelBtn').addEventListener('click', () => {
+    const f = S.stream ? currentFace() : null;
+    if (!f || !f.found || !Number.isFinite(f.pitch)) { status.textContent = 'Start the camera and look straight at it first, then press this again.'; return; }
+    const half = (CFG.pitchHi - CFG.pitchLo) / 2;
+    CFG.pitchLo = Math.max(0, f.pitch - half); CFG.pitchHi = f.pitch + half;
+    refresh(); presetSel.value = 'custom'; status.textContent = 'Level set to where you are looking now.';
+    evaluateAndRender();
+  });
+  refresh();
+})();
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
 function toggleLive() {
