@@ -185,7 +185,7 @@
 </style>
 </head>
 <body>
-<a class="skip" href="#picture-h">Skip to results</a>
+<a class="skip" id="skipLink" href="#startBtn">Skip to start or stop camera</a>
 <noscript><p>This page needs JavaScript to check your camera.</p></noscript>
 
 <div class="wrap">
@@ -339,7 +339,7 @@ const CFG = {
   yawOk: 0.2, yawFar: 0.4,
   /* Up or down: where the nose tip sits between the eyes and the mouth, 0 at the eyes and 1 at the mouth.
      Roughly 0.6 when the head is level. Lower means the chin is raised, higher means it is lowered. */
-  pitchLo: 0.45, pitchHi: 0.78,
+  pitchLo: 0.5, pitchHi: 0.7,
   faceDark: 50,               // 0 to 255 brightness
   faceBright: 205,
   frameDark: 40,
@@ -1353,6 +1353,11 @@ function evaluateAndRender() {
   if (S.videoTrack) maybeAnnounce(top, f, issues);
 }
 
+const FIXED_WORDS = {
+  center: 'Centred.', height: 'Height corrected.', distance: 'Distance corrected.', facing: 'Facing the camera.',
+  tilt: 'Tilt corrected.', pitch: 'Up and down corrected.', lightFace: 'Face lighting corrected.', lightBack: 'Background light corrected.',
+  face: 'Face found.',
+};
 function maybeAnnounce(top, f, issues) {
   if (S.paused || S.testing) return;
   const A = S.announce;
@@ -1360,10 +1365,12 @@ function maybeAnnounce(top, f, issues) {
   /* When the thing that was last spoken about has been corrected, say so straight away, without the
      usual wait, so the person knows it worked. */
   if (A.spokenId && !(issues || []).some((r) => r.id === A.spokenId) && (f.found || A.spokenId === 'face')) {
-    const text = top ? 'Good, that is corrected. ' + top.text : 'Good, that is corrected. Everything looks good. Hold this position.';
-    say(text, { auto: true });
-    A.spoken = top ? top.key : 'ok'; A.spokenId = top ? top.id : null; A.at = now;
-    A.cand = A.spoken; A.count = 2;
+    const done = FIXED_WORDS[A.spokenId] || 'Corrected.';
+    say(done, { auto: true });
+    /* Only the fixed item is announced here. Whatever is left to do, or 'looks good', follows through
+       the normal path below once it has been steady for two checks. */
+    A.spoken = null; A.spokenId = null; A.at = now - 2000;
+    A.cand = null; A.count = 0;
     return;
   }
   let key;
@@ -1441,6 +1448,11 @@ function checkNow() {
 }
 
 /* ---------- Wiring ---------- */
+document.getElementById('skipLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  els.start.focus();
+  setTimeout(() => els.start.focus(), 50);   /* some screen readers move focus again just after the link is activated */
+});
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
 function toggleLive() {
