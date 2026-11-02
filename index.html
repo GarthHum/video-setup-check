@@ -333,7 +333,7 @@ const CFG = {
   faceHeightFar: 0.14,
   faceHeightNear: 0.62,
   topEdgeMin: 0.06,
-  topLowMax: 0.42,
+  lowGap: 0.25,               // empty space above the head minus empty space below the chin, as a fraction of picture height
   bottomMax: 0.92,
   tiltMaxDeg: 10,
   yawOk: 0.2, yawFar: 0.4,
@@ -1275,7 +1275,7 @@ function evaluatePicture() {
 
     if (f.top < CFG.topEdgeMin) push('height', 'adjust', 'Your head is touching the top of the picture. Tilt the camera up a little, or sit a little lower.', 3, 'height:top');
     else if (f.bottom > CFG.bottomMax) push('height', 'adjust', 'Your chin is near the bottom of the picture. Tilt the camera down a little, or sit a little higher.', 3, 'height:bottom');
-    else if (f.top > CFG.topLowMax) push('height', 'adjust', 'There is a lot of empty space above your head. Tilt the camera down a little, or raise the camera.', 3, 'height:low');
+    else if (f.top - (1 - f.bottom) > CFG.lowGap) push('height', 'adjust', 'There is a lot of empty space above your head. Tilt the camera down a little, or raise the camera.', 3, 'height:low');
     else push('height', 'good', 'Your head sits well in the picture.', 3);
 
     if (f.size < CFG.faceHeightGood[0]) {
