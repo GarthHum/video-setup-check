@@ -426,6 +426,11 @@ const CFG = {
   /* Up or down: where the nose tip sits between the eyes and the mouth, 0 at the eyes and 1 at the mouth.
      Roughly 0.53 when the head is level, from testing. Lower means the chin is raised, higher means it is lowered. */
   pitchLo: 0.43, pitchHi: 0.63,
+  clipFrac: 0.08, crushFrac: 0.15,   // share of the face that is blown out or crushed to black before a warning
+  backlitRatio: 1.5,          // background brightness divided by face brightness
+  fpsLow: 24, dimFace: 90,   // a camera slowed below this frame rate, with a face this dark or darker, means a dim room
+  warmMax: 1.05, coolMin: 0.12, mixedGap: 0.35,   // colour: log of red over blue on the face
+  settleRange: 25, settleMs: 2500,   // lighting is judged only once the camera has stopped adjusting
   faceDark: 50,               // 0 to 255 brightness
   faceBright: 205,
   frameDark: 40,
@@ -555,7 +560,7 @@ function say(text, opts) {
 /* ---------- Rows ---------- */
 const PICTURE_ROWS = [
   ['camera', 'Camera'], ['face', 'Face'], ['center', 'Centering'], ['height', 'Height in frame'],
-  ['distance', 'Distance'], ['facing', 'Facing the camera'], ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'],
+  ['distance', 'Distance'], ['facing', 'Facing the camera'], ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'], ['lightColour', 'Colour of the light'],
 ];
 const SOUND_ROWS = [['voice', 'Speaking level'], ['noise', 'Background noise'], ['clip', 'Distortion']];
 const STATE_LABEL = { good: 'Good', adjust: 'Adjust', unknown: 'Unknown', untested: 'Not tested' };
@@ -748,6 +753,8 @@ async function attach({ stream, kind, err }) {
     els.stageInner.hidden = true;
     els.placeholder.hidden = true;
   }
+  S.startedAt = Date.now();
+  watchFrames();
   if (S.audioTrack) setupAudio(S.audioTrack);
 
   await refreshDevices();
@@ -962,48 +969,105 @@ function pickFace(faces) {
      picture, and measuring against its height would wrongly make a normal arm's-length face look small. */
   const vw = els.video.videoWidth || 1, vh = els.video.videoHeight || 1;
   const size = f.h * vh / Math.min(vw, vh);
-  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, size, tilt, yaw, pitch, count: faces.length };
+  return { cx: f.x + f.w / 2, top: f.y, bottom: f.y + f.h, w: f.w, h: f.h, size, tilt, yaw, pitch, count: faces.length,
+    kp: (f.eyes && f.mouth) ? { eyes: [f.eyes.l, f.eyes.r], mouth: f.mouth } : null };
 }
 
+/* Frame rate actually delivered. A camera that is short of light slows down, so this is a good sign of a dim room. */
+function measuredFps() {
+  const ft = S.frameTimes;
+  if (!ft || ft.length < 12) return null;
+  const now = performance.now();
+  const recent = ft.filter((x) => now - x < 2500);
+  if (recent.length < 12 || now - recent[0] < 1500) return null;
+  return (recent.length - 1) / ((recent[recent.length - 1] - recent[0]) / 1000);
+}
+function watchFrames() {
+  const v = els.video;
+  if (!v.requestVideoFrameCallback) return;
+  S.frameTimes = [];
+  const token = S.stream;
+  const cb = () => {
+    if (S.stream !== token) return;
+    S.frameTimes.push(performance.now());
+    if (S.frameTimes.length > 120) S.frameTimes.shift();
+    v.requestVideoFrameCallback(cb);
+  };
+  v.requestVideoFrameCallback(cb);
+}
 const SC = document.createElement('canvas');
-SC.width = 160; SC.height = 90;
+SC.width = 256; SC.height = 144;
 const sctx = SC.getContext('2d', { willReadFrequently: true });
+/* Samples the picture. Lighting on the face is read from patches on the forehead and both cheeks,
+   found from the eye and mouth points, so hair and background at the edge of the face box do not count. */
 function sampleLuma(face) {
   const v = els.video;
-  const W = 160;
-  const H = Math.max(1, Math.round(160 * v.videoHeight / v.videoWidth));
+  const W = 256;
+  const H = Math.max(1, Math.round(W * v.videoHeight / v.videoWidth));
   if (SC.height !== H) SC.height = H;
   sctx.drawImage(v, 0, 0, W, H);
   const d = sctx.getImageData(0, 0, W, H).data;
-  let as = 0, an = 0, fs = 0, fn = 0, bs = 0, bn = 0, ls = 0, ln = 0, rs = 0, rn = 0;
-  let ix0 = 0, ix1 = 0, iy0 = 0, iy1 = 0, ex0 = 0, ex1 = 0, ey0 = 0, cxp = 0;
+  const mk = () => ({ n: 0, l: 0, r: 0, g: 0, b: 0, clip: 0, crush: 0 });
+  const A = mk(), F = mk(), FL = mk(), FR = mk(), B = mk(), BL = mk(), BR = mk();
+  let patches = null, ex0 = 0, ex1 = 0, ey0 = 0, cxp = 0, box = null;
   if (face) {
-    ix0 = (face.cx - face.w * 0.35) * W; ix1 = (face.cx + face.w * 0.35) * W;
-    iy0 = (face.top + face.h * 0.25) * H; iy1 = (face.top + face.h * 0.85) * H;
+    cxp = face.cx * W;
     ex0 = (face.cx - face.w * 1.1) * W; ex1 = (face.cx + face.w * 1.1) * W;
     ey0 = (face.top - face.h * 0.6) * H;
-    cxp = face.cx * W;
+    if (face.kp) {
+      const e = [face.kp.eyes[0], face.kp.eyes[1]].sort((p, q) => p.x - q.x);
+      const eA = { x: e[0].x * W, y: e[0].y * H }, eB = { x: e[1].x * W, y: e[1].y * H };
+      const dd = Math.max(4, Math.hypot(eB.x - eA.x, eB.y - eA.y));
+      const ey = (eA.y + eB.y) / 2, mx = (eA.x + eB.x) / 2;
+      const m = Math.max(dd * 0.6, face.kp.mouth.y * H - ey);
+      patches = [
+        { r: [mx - 0.45 * dd, mx + 0.45 * dd, ey - 0.95 * m, ey - 0.4 * m], side: 'c' },
+        { r: [eA.x - 0.1 * dd, eA.x + 0.35 * dd, ey + 0.35 * m, ey + 0.85 * m], side: 'l' },
+        { r: [eB.x - 0.35 * dd, eB.x + 0.1 * dd, ey + 0.35 * m, ey + 0.85 * m], side: 'r' },
+      ];
+    } else {
+      box = [(face.cx - face.w * 0.35) * W, (face.cx + face.w * 0.35) * W, (face.top + face.h * 0.25) * H, (face.top + face.h * 0.85) * H];
+    }
   }
+  const add = (s, l, R, G, Bl) => {
+    s.n++; s.l += l; s.r += R; s.g += G; s.b += Bl;
+    if (l >= 245) s.clip++;
+    if (l <= 18) s.crush++;
+  };
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
-      const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-      as += l; an++;
+      const R = d[i], G = d[i + 1], Bl = d[i + 2];
+      const l = 0.2126 * R + 0.7152 * G + 0.0722 * Bl;
+      A.n++; A.l += l;
       if (!face) continue;
-      if (x >= ix0 && x <= ix1 && y >= iy0 && y <= iy1) {
-        fs += l; fn++;
-        if (x < cxp) { ls += l; ln++; } else { rs += l; rn++; }
-      } else if (!(x >= ex0 && x <= ex1 && y >= ey0)) {
-        bs += l; bn++;
+      let inFace = false;
+      if (patches) {
+        for (const p of patches) {
+          if (x >= p.r[0] && x <= p.r[1] && y >= p.r[2] && y <= p.r[3]) {
+            add(F, l, R, G, Bl); inFace = true;
+            if (p.side === 'l') add(FL, l, R, G, Bl); else if (p.side === 'r') add(FR, l, R, G, Bl);
+            break;
+          }
+        }
+      } else if (box && x >= box[0] && x <= box[1] && y >= box[2] && y <= box[3]) {
+        add(F, l, R, G, Bl); inFace = true;
+        if (x < cxp) add(FL, l, R, G, Bl); else add(FR, l, R, G, Bl);
+      }
+      if (!inFace && !(x >= ex0 && x <= ex1 && y >= ey0)) {
+        add(B, l, R, G, Bl);
+        if (x < cxp) add(BL, l, R, G, Bl); else add(BR, l, R, G, Bl);
       }
     }
   }
+  const mean = (s) => (s.n ? s.l / s.n : null);
+  const rgb = (s) => (s.n ? { r: s.r / s.n, g: s.g / s.n, b: s.b / s.n } : null);
   return {
-    frame: as / an,
-    face: fn ? fs / fn : null,
-    imgLeft: ln ? ls / ln : null,
-    imgRight: rn ? rs / rn : null,
-    bg: bn ? bs / bn : null,
+    frame: A.l / A.n,
+    face: mean(F), imgLeft: mean(FL), imgRight: mean(FR),
+    bg: mean(B), bgLeft: mean(BL), bgRight: mean(BR),
+    faceClip: F.n ? F.clip / F.n : null, faceCrush: F.n ? F.crush / F.n : null,
+    rgb: rgb(F), rgbL: rgb(FL), rgbR: rgb(FR),
   };
 }
 
@@ -1310,6 +1374,12 @@ function currentFace() {
     yaw: num((s) => s.face.yaw),
     pitch: num((s) => s.face.pitch),
     lFace: num((s) => s.luma.face), lLeft: num((s) => s.luma.imgLeft), lRight: num((s) => s.luma.imgRight), lBg: num((s) => s.luma.bg),
+    lBgL: num((s) => s.luma.bgLeft), lBgR: num((s) => s.luma.bgRight),
+    clip: num((s) => s.luma.faceClip), crush: num((s) => s.luma.faceCrush),
+    warm: num((s) => (s.luma.rgb ? Math.log(Math.max(1, s.luma.rgb.r) / Math.max(1, s.luma.rgb.b)) : NaN)),
+    warmL: num((s) => (s.luma.rgbL ? Math.log(Math.max(1, s.luma.rgbL.r) / Math.max(1, s.luma.rgbL.b)) : NaN)),
+    warmR: num((s) => (s.luma.rgbR ? Math.log(Math.max(1, s.luma.rgbR.r) / Math.max(1, s.luma.rgbR.b)) : NaN)),
+    lSpread: (() => { const a = withFace.map((s) => s.luma.face).filter(Number.isFinite); return a.length ? Math.max(...a) - Math.min(...a) : 0; })(),
   };
 }
 
@@ -1337,6 +1407,7 @@ function evaluatePictureAll() {
 
   const f = currentFace();
   const faceDeps = ['center', 'height', 'distance', 'facing', 'tilt', 'pitch'];
+  /* colour is judged with the lighting rows, below */
   if (S.detectorState === 'idle' || S.detectorState === 'loading') {
     push('face', 'unknown', 'Loading the face detector. This can take a few seconds the first time.', 99);
     wait(faceDeps, 'Waiting for the face detector.');
@@ -1401,23 +1472,61 @@ function evaluatePictureAll() {
   const lumas = S.samples.slice(-CFG.window).map((s) => (s.luma ? s.luma.frame : NaN)).filter(Number.isFinite);
   const frameLuma = lumas.length ? median(lumas) : NaN;
   if (f.found && Number.isFinite(f.lFace)) {
-    const side = f.lLeft - f.lRight; // negative: image left is darker, which is your right side
-    if (f.lFace < CFG.faceDark) push('lightFace', 'adjust', 'Your face is quite dark. Add a light in front of you, behind the camera, or face a window.', 6, 'light:dark');
-    else if (f.lFace > CFG.faceBright) push('lightFace', 'adjust', 'Your face is very bright and may lose detail. Reduce the light on you or move away from the lamp.', 6, 'light:bright');
-    else if (Number.isFinite(side) && side < -CFG.sideGap) push('lightFace', 'adjust', 'Your right side is darker than your left. Add light from your right, or turn a little toward your main light.', 6, 'light:side:right');
-    else if (Number.isFinite(side) && side > CFG.sideGap) push('lightFace', 'adjust', 'Your left side is darker than your right. Add light from your left, or turn a little toward your main light.', 6, 'light:side:left');
-    else push('lightFace', 'good', 'Your face is evenly lit.', 6);
+    /* The camera adjusts its exposure for a second or two after any change. Judging during that would give
+       advice that is out of date a moment later, so lighting waits until the picture has settled. */
+    const settling = (S.startedAt && Date.now() - S.startedAt < CFG.settleMs) || f.lSpread > CFG.settleRange;
+    if (settling) {
+      for (const id of ['lightFace', 'lightBack', 'lightColour']) push(id, 'unknown', 'The camera is still adjusting to the light.', 99);
+    } else {
+      const side = f.lLeft - f.lRight; // negative: image left is darker, which is your right side
+      const backlit = Number.isFinite(f.lBg) && f.lBg > CFG.backlitMinBg && f.lBg / Math.max(1, f.lFace) > CFG.backlitRatio && (f.lBg - f.lFace) > CFG.backlitGap / 2;
+      const fps = measuredFps();
+      const slow = fps !== null && fps < CFG.fpsLow && !(S.camInfo && S.camInfo.fps && S.camInfo.fps < 27);
+      const fpsText = slow ? ' The camera has slowed to about ' + Math.round(fps) + ' frames per second, which also means it is short of light.' : '';
+      if (f.lFace < CFG.faceDark) {
+        push('lightFace', 'adjust', backlit
+          ? 'Your face is dark because of the bright light behind you. Face the light, or close the blinds.' + fpsText
+          : 'Your face is quite dark. Add a light in front of you, behind the camera, or face a window.' + fpsText, 6, 'light:dark:' + backlit);
+      } else if (slow && f.lFace < CFG.dimFace) {
+        push('lightFace', 'adjust', 'The camera has slowed to about ' + Math.round(fps) + ' frames per second, which usually means the room is too dim. Add more light in front of you.', 6, 'light:dim');
+      } else if (f.lFace > CFG.faceBright) {
+        push('lightFace', 'adjust', 'Your face is very bright and may lose detail. Reduce the light on you or move away from the lamp.', 6, 'light:bright');
+      } else if (Number.isFinite(f.clip) && f.clip > CFG.clipFrac) {
+        push('lightFace', 'adjust', 'Parts of your face are washed out to white. Turn the light down, move it further away, or soften it.', 6, 'light:clip');
+      } else if (Number.isFinite(f.crush) && f.crush > CFG.crushFrac) {
+        push('lightFace', 'adjust', 'Parts of your face are in deep shadow. Add a softer light in front of you.', 6, 'light:crush');
+      } else if (Number.isFinite(side) && side < -CFG.sideGap) {
+        push('lightFace', 'adjust', 'Your right side is darker than your left. Add light from your right, or turn a little toward your main light.', 6, 'light:side:right');
+      } else if (Number.isFinite(side) && side > CFG.sideGap) {
+        push('lightFace', 'adjust', 'Your left side is darker than your right. Add light from your left, or turn a little toward your main light.', 6, 'light:side:left');
+      } else push('lightFace', 'good', 'Your face is evenly lit.', 6);
 
-    if (Number.isFinite(f.lBg) && (f.lBg - f.lFace) > CFG.backlitGap && f.lBg > CFG.backlitMinBg) {
-      push('lightBack', 'adjust', 'There is a bright light or window behind you. Face the light instead, or close the blinds.', 7, 'back');
-    } else if (Number.isFinite(f.lBg)) push('lightBack', 'good', 'Nothing bright behind you.', 7);
-    else push('lightBack', 'unknown', 'Could not measure the background.', 99);
+      if (backlit) {
+        /* The raw picture is not mirrored, so its left side is your right side. */
+        let where = '';
+        if (Number.isFinite(f.lBgL) && Number.isFinite(f.lBgR)) {
+          if (f.lBgL > f.lBgR * 1.25) where = ', mostly on your right';
+          else if (f.lBgR > f.lBgL * 1.25) where = ', mostly on your left';
+        }
+        push('lightBack', 'adjust', 'There is a bright light or window behind you' + where + '. Face the light instead, or close the blinds.', 7, 'back:' + where);
+      } else if (Number.isFinite(f.lBg)) push('lightBack', 'good', 'Nothing bright behind you.', 7);
+      else push('lightBack', 'unknown', 'Could not measure the background.', 99);
+
+      if (!Number.isFinite(f.warm)) push('lightColour', 'unknown', 'Could not measure the colour of the light.', 99);
+      else if (f.warm > CFG.warmMax) push('lightColour', 'adjust', 'Your face looks very orange, probably from a warm lamp. Use a whiter light if you can.', 8, 'colour:warm');
+      else if (f.warm < CFG.coolMin) push('lightColour', 'adjust', 'Your face looks very blue or pale, probably from a screen or a cold light. Add a warmer, whiter light if you can.', 8, 'colour:cool');
+      else if (Number.isFinite(f.warmL) && Number.isFinite(f.warmR) && Math.abs(f.warmL - f.warmR) > CFG.mixedGap) {
+        push('lightColour', 'adjust', 'The two sides of your face are lit with different colours of light, for example a lamp on one side and a window on the other. Use the same kind of light on both sides.', 8, 'colour:mixed');
+      } else push('lightColour', 'good', 'The colour of the light looks natural.', 8);
+    }
   } else if (Number.isFinite(frameLuma) && frameLuma < CFG.frameDark) {
     push('lightFace', 'adjust', 'The whole picture is very dark. Turn on a light in front of you, or face a window.', 0, 'light:frame-dark');
     push('lightBack', 'unknown', 'Needs a visible face.', 99);
+    push('lightColour', 'unknown', 'Needs a visible face.', 99);
   } else {
     push('lightFace', 'unknown', 'Needs a visible face.', 99);
     push('lightBack', 'unknown', 'Needs a visible face.', 99);
+    push('lightColour', 'unknown', 'Needs a visible face.', 99);
   }
   return out;
 }
@@ -1578,7 +1687,7 @@ const getSetting = (k) => (k === 'faceMin' ? CFG.faceHeightGood[0] : k === 'face
 const putSetting = (k, v) => { if (k === 'faceMin') CFG.faceHeightGood[0] = v; else if (k === 'faceMax') CFG.faceHeightGood[1] = v; else CFG[k] = v; };
 PRESETS.balanced = Object.fromEntries(SETTING_DEFS.map((d) => [d.key, getSetting(d.key)]));
 const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Height in the picture'], ['distance', 'Distance'], ['facing', 'Facing the camera'],
-  ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you']];
+  ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'], ['lightColour', 'Colour of the light']];
 (() => {
   const presetSel = document.getElementById('preset'), fields = document.getElementById('settingsFields');
   const status = document.getElementById('settingsStatus'), box = document.getElementById('feedbackTypes');
