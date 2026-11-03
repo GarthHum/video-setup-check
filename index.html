@@ -395,7 +395,11 @@
         <button type="button" id="clearBtn" class="btn secondary">Clear saved settings</button>
       </div>
       <p id="settingsStatus" class="small" role="status"></p>
-      <div id="settingsFields"></div>
+      <details id="customLimits" style="margin-top:1rem">
+        <summary>Advanced settings</summary>
+        <p class="small">Fine-tune each limit. Changing any of them switches Strictness to Custom.</p>
+        <div id="settingsFields"></div>
+      </details>
       <div class="control-row" style="margin-top:1rem"><button type="button" id="settingsClose2" class="btn">Close settings</button></div>
     </dialog>
   </main>
