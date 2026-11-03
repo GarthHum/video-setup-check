@@ -31,7 +31,7 @@
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #0d1313;
       --surface: #151d1d;
       --ink: #e7efee;
@@ -54,6 +54,30 @@
       --zone-hot: #ef5a50;
     }
   }
+  :root[data-theme="dark"] {
+      --bg: #0d1313;
+      --surface: #151d1d;
+      --ink: #e7efee;
+      --muted: #a6b8b5;
+      --line: #2c3b3a;
+      --accent: #63d2d0;
+      --on-accent: #04201f;
+      --focus: #8fe6e4;
+      --good: #62d493;
+      --good-bg: #14301f;
+      --warn: #f2b552;
+      --warn-bg: #35280f;
+      --bad: #ff948c;
+      --bad-bg: #3a1815;
+      --stage: #070c0c;
+      --track: #223030;
+      --zone-low: #4f6361;
+      --zone-quiet: #c48f2c;
+      --zone-good: #3fbf7c;
+      --zone-hot: #ef5a50;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] { color-scheme: light; }
 
   * { box-sizing: border-box; }
   html { font-size: 106.25%; }
@@ -334,6 +358,14 @@
           <option value="balanced" selected>Balanced</option>
           <option value="picky">Picky</option>
           <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="field" style="max-width:20rem; margin-top:1rem">
+        <label for="theme">Appearance</label>
+        <select id="theme">
+          <option value="auto" selected>Match my device</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
         </select>
       </div>
       <div class="field" style="max-width:20rem; margin-top:1rem">
@@ -1592,6 +1624,13 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     evaluateAndRender();
   });
   refresh();
+  const themeSel = document.getElementById('theme');
+  const setTheme = (v) => {
+    if (v === 'light' || v === 'dark') document.documentElement.setAttribute('data-theme', v);
+    else document.documentElement.removeAttribute('data-theme');
+    themeSel.value = (v === 'light' || v === 'dark') ? v : 'auto';
+  };
+  themeSel.addEventListener('change', () => { setTheme(themeSel.value); status.textContent = themeSel.options[themeSel.selectedIndex].text + ' appearance.'; });
   const rateSel = document.getElementById('speechRate'), rateHelp = document.getElementById('speechRateHelp');
   if (IOS) {
     rateSel.disabled = true;
@@ -1606,7 +1645,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   /* Saving: the one thing this page ever stores, and only when asked. */
   const KEY = 'checkmycamera.settings';
   document.getElementById('saveBtn').addEventListener('click', () => {
-    const data = { preset: presetSel.value, rate: S.rate, values: {}, off: {} };
+    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, values: {}, off: {} };
     for (const d of SETTING_DEFS) data.values[d.key] = getSetting(d.key);
     for (const [id] of FEEDBACK_TYPES) if (OFF[id]) data.off[id] = true;
     try { localStorage.setItem(KEY, JSON.stringify(data)); status.textContent = 'Settings saved on this device.'; }
@@ -1628,6 +1667,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
       }
       if (typeof data.rate === 'number' && data.rate > 0 && !IOS) { S.rate = data.rate; if ([...rateSel.options].some((o) => o.value === String(data.rate))) rateSel.value = String(data.rate); }
       if (['relaxed', 'balanced', 'picky', 'custom'].includes(data.preset)) presetSel.value = data.preset;
+      setTheme(data.theme);
       refresh();
     }
   } catch (e) { /* no saved settings, or storage is blocked */ }
