@@ -200,7 +200,7 @@
 <div class="wrap">
   <header>
     <h1>Check My Camera</h1>
-    <p class="lede">Check your framing and lighting before you record or join a call. Everything runs in your browser. Nothing is saved or uploaded.</p>
+    <p class="lede">Check your framing and lighting before you record or join a call. Everything runs in your browser. Nothing is uploaded.</p>
   </header>
 
   <main id="main" style="display:grid; gap:1rem;">
@@ -283,8 +283,8 @@
       <details>
         <summary>What happens to my video and audio?</summary>
         <p>Your video is not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The page does not use your microphone.</p>
-        <p>Nothing is saved to your computer. Everything exists only in your browser's memory while the page is open. Choosing Stop camera, closing the tab, or leaving the page turns the camera off and clears it all.</p>
-        <p>This page saves nothing on your computer: no video, audio, results or settings. It sets no cookies, has no accounts and has no analytics.</p>
+        <p>Your video and picture results are never saved. They exist only in your browser's memory while the page is open. Choosing Stop camera, closing the tab, or leaving the page turns the camera off and clears it all.</p>
+        <p>The page saves no video, audio or results. The only thing it ever stores on your computer is your settings, and only if you press Save my settings in the Settings window. They are kept in your browser's local storage on this device, not in a cookie, and are never sent anywhere. Clear saved settings in the same window removes them. The page sets no cookies, has no accounts and has no analytics.</p>
         <p>Some things are downloaded to your browser. The first time the face detector runs, your browser downloads its program code from the jsDelivr code delivery service and its small face model file from Google's servers. These are downloads to your computer and do not include your video. As with any website, the servers that provide the page and those files can see ordinary visit details such as your internet address and browser type. The page itself is hosted on GitHub Pages.</p>
         <p>Voice feedback uses the speech built into your browser. The words spoken are short advice messages made by this page, never your video or audio. Some browsers use online voices, and if yours does, the spoken words may be sent to the voice provider.</p>
         <p>You can read the full source code of this page at <a href="https://github.com/GarthHum/video-setup-check">GarthHum/video-setup-check on GitHub</a>.</p>
@@ -326,7 +326,7 @@
       <dialog id="settingsDialog" aria-labelledby="settingsTitle">
       <h2 id="settingsTitle">Settings</h2>
       <div class="control-row"><button type="button" id="settingsClose" class="btn">Close settings</button></div>
-      <p class="small">These change how strict the picture checks are. They apply straight away and are not saved, so they reset when you leave the page.</p>
+      <p class="small">These change how strict the picture checks are. They apply straight away. Unless you press Save my settings, they reset when you leave the page. Saved settings are kept only in this browser, on this device.</p>
       <div class="field" style="max-width:20rem">
         <label for="preset">Strictness</label>
         <select id="preset">
@@ -352,6 +352,8 @@
       <div class="control-row">
         <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
         <button type="button" id="resetBtn" class="btn secondary">Reset to Balanced</button>
+        <button type="button" id="saveBtn" class="btn">Save my settings</button>
+        <button type="button" id="clearBtn" class="btn secondary">Clear saved settings</button>
       </div>
       <p id="settingsStatus" class="small" role="status"></p>
       <div id="settingsFields"></div>
@@ -1541,11 +1543,12 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
 (() => {
   const presetSel = document.getElementById('preset'), fields = document.getElementById('settingsFields');
   const status = document.getElementById('settingsStatus'), box = document.getElementById('feedbackTypes');
-  const inputs = {};
+  const inputs = {}, boxes = {};
   const refresh = () => { for (const d of SETTING_DEFS) inputs[d.key].value = Math.round(getSetting(d.key) * d.scale * 100) / 100; };
   for (const [id, name] of FEEDBACK_TYPES) {
     const l = document.createElement('label'); l.className = 'opt';
     const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true;
+    boxes[id] = c;
     c.addEventListener('change', () => {
       OFF[id] = !c.checked;
       if (rowEls[id]) rowEls[id].li.hidden = !c.checked;
@@ -1599,6 +1602,35 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     unlockSpeech();
     say('This is the voice at this speed.');
   });
+
+  /* Saving: the one thing this page ever stores, and only when asked. */
+  const KEY = 'checkmycamera.settings';
+  document.getElementById('saveBtn').addEventListener('click', () => {
+    const data = { preset: presetSel.value, rate: S.rate, values: {}, off: {} };
+    for (const d of SETTING_DEFS) data.values[d.key] = getSetting(d.key);
+    for (const [id] of FEEDBACK_TYPES) if (OFF[id]) data.off[id] = true;
+    try { localStorage.setItem(KEY, JSON.stringify(data)); status.textContent = 'Settings saved on this device.'; }
+    catch (e) { status.textContent = 'This browser would not let the page save settings.'; }
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    try { localStorage.removeItem(KEY); status.textContent = 'Saved settings cleared. The current settings stay until you leave the page.'; }
+    catch (e) { status.textContent = 'Nothing could be cleared.'; }
+  });
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      for (const d of SETTING_DEFS) { const v = data.values && data.values[d.key]; if (typeof v === 'number' && v >= 0) putSetting(d.key, v); }
+      for (const [id] of FEEDBACK_TYPES) {
+        const off = !!(data.off && data.off[id]);
+        OFF[id] = off; boxes[id].checked = !off;
+        if (rowEls[id]) rowEls[id].li.hidden = off;
+      }
+      if (typeof data.rate === 'number' && data.rate > 0 && !IOS) { S.rate = data.rate; if ([...rateSel.options].some((o) => o.value === String(data.rate))) rateSel.value = String(data.rate); }
+      if (['relaxed', 'balanced', 'picky', 'custom'].includes(data.preset)) presetSel.value = data.preset;
+      refresh();
+    }
+  } catch (e) { /* no saved settings, or storage is blocked */ }
 })();
 (() => {
   const dlg = document.getElementById('settingsDialog'), openBtn = document.getElementById('settingsBtn');
