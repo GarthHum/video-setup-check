@@ -178,13 +178,15 @@
   summary { cursor: pointer; font-weight: 650; padding: .25rem 0; }
   details p { margin: .5rem 0 0; max-width: 46rem; }
 
-  #settings fieldset { border: 1px solid var(--line); border-radius: .5rem; margin: 1rem 0; padding: .75rem 1rem; }
-  #settings legend { font-weight: 650; padding: 0 .4rem; }
-  #settings .opt { display: block; margin: .35rem 0; }
-  #settings .numrow { margin: .9rem 0; }
-  #settings .numrow label { display: block; font-weight: 650; }
-  #settings .numrow input { width: 7rem; font: inherit; padding: .3rem .5rem; margin: .25rem 0; }
-  #settings .numrow .small { margin: 0; }
+  dialog#settingsDialog { max-width: 42rem; width: calc(100% - 2rem); max-height: 90vh; overflow: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: .75rem; padding: 1.25rem; }
+  dialog#settingsDialog::backdrop { background: rgba(0,0,0,.55); }
+  #settings fieldset, #settingsDialog fieldset { border: 1px solid var(--line); border-radius: .5rem; margin: 1rem 0; padding: .75rem 1rem; }
+  #settingsDialog legend { font-weight: 650; padding: 0 .4rem; }
+  #settingsDialog .opt { display: block; margin: .35rem 0; }
+  #settingsDialog .numrow { margin: .9rem 0; }
+  #settingsDialog .numrow label { display: block; font-weight: 650; }
+  #settingsDialog .numrow input { width: 7rem; font: inherit; padding: .3rem .5rem; margin: .25rem 0; }
+  #settingsDialog .numrow .small { margin: 0; }
   @media (prefers-reduced-motion: reduce) { .meter-cover { transition: none; } }
   @media (forced-colors: active) {
     .pill, .panel, .meter { border: 1px solid CanvasText; }
@@ -209,6 +211,7 @@
         <button type="button" id="checkBtn" class="btn secondary" aria-keyshortcuts="C" disabled>Check my picture now</button>
         <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="L">Start live voice feedback</button>
         <button type="button" id="describeBtn" class="btn secondary" aria-keyshortcuts="D" disabled>Describe my setup</button>
+        <button type="button" id="settingsBtn" class="btn secondary" aria-haspopup="dialog">Settings</button>
       </div>
       <div id="errorBox" class="notice" role="alert" hidden></div>
       <p id="checkResult" tabindex="-1"></p>
@@ -277,38 +280,6 @@
 
     <section class="panel" aria-labelledby="help-h">
       <h2 id="help-h">Help</h2>
-    <details id="settings">
-      <summary>Advanced settings</summary>
-      <p class="small">These change how strict the picture checks are. They apply straight away and are not saved, so they reset when you leave the page.</p>
-      <div class="field" style="max-width:20rem">
-        <label for="preset">Strictness</label>
-        <select id="preset">
-          <option value="relaxed">Relaxed</option>
-          <option value="balanced" selected>Balanced</option>
-          <option value="picky">Picky</option>
-          <option value="custom">Custom</option>
-        </select>
-      </div>
-      <div class="field" style="max-width:20rem; margin-top:1rem">
-        <label for="speechRate">Browser voice speed</label>
-        <select id="speechRate">
-          <option value="0.8">Slower</option>
-          <option value="1" selected>Normal</option>
-          <option value="1.25">Faster</option>
-          <option value="1.5">Much faster</option>
-          <option value="1.75">Very fast</option>
-          <option value="2">Fastest</option>
-        </select>
-        <p class="small" id="speechRateHelp" style="margin:.25rem 0 0">Changes the voice that speaks the advice. It does not change your screen reader.</p>
-      </div>
-      <fieldset id="feedbackTypes"><legend>Give feedback on</legend></fieldset>
-      <div class="control-row">
-        <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
-        <button type="button" id="resetBtn" class="btn secondary">Reset to Balanced</button>
-      </div>
-      <p id="settingsStatus" class="small" role="status"></p>
-      <div id="settingsFields"></div>
-    </details>
       <details>
         <summary>What happens to my video and audio?</summary>
         <p>Your video is not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The page does not use your microphone.</p>
@@ -352,6 +323,40 @@
         <p>Current Chrome, Edge, Firefox and Safari on Mac and Windows. The page must be opened over https or from your own computer for the browser to allow camera access.</p>
       </details>
     </section>
+      <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">Settings</h2>
+      <div class="control-row"><button type="button" id="settingsClose" class="btn">Close settings</button></div>
+      <p class="small">These change how strict the picture checks are. They apply straight away and are not saved, so they reset when you leave the page.</p>
+      <div class="field" style="max-width:20rem">
+        <label for="preset">Strictness</label>
+        <select id="preset">
+          <option value="relaxed">Relaxed</option>
+          <option value="balanced" selected>Balanced</option>
+          <option value="picky">Picky</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="field" style="max-width:20rem; margin-top:1rem">
+        <label for="speechRate">Browser voice speed</label>
+        <select id="speechRate">
+          <option value="0.8">Slower</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.25">Faster</option>
+          <option value="1.5">Much faster</option>
+          <option value="1.75">Very fast</option>
+          <option value="2">Fastest</option>
+        </select>
+        <p class="small" id="speechRateHelp" style="margin:.25rem 0 0">Changes the voice that speaks the advice. It does not change your screen reader.</p>
+      </div>
+      <fieldset id="feedbackTypes"><legend>Give feedback on</legend></fieldset>
+      <div class="control-row">
+        <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
+        <button type="button" id="resetBtn" class="btn secondary">Reset to Balanced</button>
+      </div>
+      <p id="settingsStatus" class="small" role="status"></p>
+      <div id="settingsFields"></div>
+      <div class="control-row" style="margin-top:1rem"><button type="button" id="settingsClose2" class="btn">Close settings</button></div>
+    </dialog>
   </main>
 </div>
 
@@ -1595,6 +1600,17 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     say('This is the voice at this speed.');
   });
 })();
+(() => {
+  const dlg = document.getElementById('settingsDialog'), openBtn = document.getElementById('settingsBtn');
+  const close = () => { if (dlg.open) dlg.close(); };
+  openBtn.addEventListener('click', () => {
+    if (typeof dlg.showModal !== 'function') { dlg.setAttribute('open', ''); return; }
+    dlg.showModal();
+  });
+  document.getElementById('settingsClose').addEventListener('click', close);
+  document.getElementById('settingsClose2').addEventListener('click', close);
+  dlg.addEventListener('close', () => openBtn.focus());   /* back to the button that opened it */
+})();
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
 function toggleLive() {
@@ -1617,6 +1633,7 @@ document.addEventListener('keydown', (e) => {
   if (!combo && !plain) return;
   const t = e.target;
   const tag = t && t.tagName;
+  if (t && t.closest && t.closest('dialog')) return;   /* typing inside the settings window */
   if (plain && (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable))) return;
   const busy = () => { if (S.testing) { els.voiceStatus.textContent = 'Please wait until the voice test finishes.'; return true; } return false; };
   switch (e.code) {
