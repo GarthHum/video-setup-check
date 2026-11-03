@@ -274,7 +274,10 @@
     </details>
 
 
-    <details class="panel" id="settings">
+
+    <section class="panel" aria-labelledby="help-h">
+      <h2 id="help-h">Help</h2>
+    <details id="settings">
       <summary>Advanced settings</summary>
       <p class="small">These change how strict the picture checks are. They apply straight away and are not saved, so they reset when you leave the page.</p>
       <div class="field" style="max-width:20rem">
@@ -286,6 +289,18 @@
           <option value="custom">Custom</option>
         </select>
       </div>
+      <div class="field" style="max-width:20rem; margin-top:1rem">
+        <label for="speechRate">Browser voice speed</label>
+        <select id="speechRate">
+          <option value="0.8">Slower</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.25">Faster</option>
+          <option value="1.5">Much faster</option>
+          <option value="1.75">Very fast</option>
+          <option value="2">Fastest</option>
+        </select>
+        <p class="small" id="speechRateHelp" style="margin:.25rem 0 0">Changes the voice that speaks the advice. It does not change your screen reader.</p>
+      </div>
       <fieldset id="feedbackTypes"><legend>Give feedback on</legend></fieldset>
       <div class="control-row">
         <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
@@ -294,9 +309,6 @@
       <p id="settingsStatus" class="small" role="status"></p>
       <div id="settingsFields"></div>
     </details>
-
-    <section class="panel" aria-labelledby="help-h">
-      <h2 id="help-h">Help</h2>
       <details>
         <summary>What happens to my video and audio?</summary>
         <p>Your video is not sent to this website or to anyone else. The picture from your camera is shown in the preview and checked on your own computer. Frames are used only to find your face and measure brightness, and each one is discarded or overwritten by the next. The page does not use your microphone.</p>
@@ -414,7 +426,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
-  paused: true, utter: null,
+  paused: true, utter: null, rate: 1,
 };
 
 /* ---------- Announcements ---------- */
@@ -476,6 +488,7 @@ function speak(text, interrupt) {
     try {
       const u = new SpeechSynthesisUtterance(text);
       S.utter = u; // keeps the utterance alive until it ends, because Chrome can drop it otherwise
+      u.rate = S.rate;
       u.onend = finish;
       u.onerror = finish;
       if (interrupt) synth.cancel();
@@ -1464,8 +1477,14 @@ function showCheck(text) {
   els.checkResult.focus();
 }
 function checkNow() {
-  if (!S.stream) { showCheck('The camera is not running. Press Start first.'); return; }
-  if (!S.videoTrack) { showCheck('No camera is running. Use Describe my setup for the microphone, or Test my voice.'); return; }
+  /* The result is shown as text and spoken by the browser voice. Focus stays where it is. */
+  const out = (text) => {
+    els.checkResult.textContent = text;
+    if (!synth && !IOS) els.checkResult.focus();   /* no browser voice here, so the screen reader reads it instead */
+    else say(text);
+  };
+  if (!S.stream) { out('The camera is not running. Press Start first.'); return; }
+  if (!S.videoTrack) { out('No camera is running.'); return; }
   const rows = evaluatePicture();
   const adjust = rows.filter((r) => r.state === 'adjust' && r.id !== 'camera').sort((a, b) => a.pri - b.pri);
   const f = currentFace();
@@ -1474,7 +1493,7 @@ function checkNow() {
   else if (f.found) text = 'Everything looks good. Hold this position.';
   else text = els.coach.textContent;
   S.announce.at = Date.now() + 6000;
-  showCheck(text);
+  out(text);
 }
 
 /* ---------- Wiring ---------- */
@@ -1565,6 +1584,16 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     evaluateAndRender();
   });
   refresh();
+  const rateSel = document.getElementById('speechRate'), rateHelp = document.getElementById('speechRateHelp');
+  if (IOS) {
+    rateSel.disabled = true;
+    rateHelp.textContent = 'On an iPhone or iPad the advice is read by VoiceOver, so change its speed in the VoiceOver settings.';
+  }
+  rateSel.addEventListener('change', () => {
+    S.rate = parseFloat(rateSel.value) || 1;
+    unlockSpeech();
+    say('This is the voice at this speed.');
+  });
 })();
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
@@ -1576,7 +1605,7 @@ function toggleLive() {
   say(S.paused ? 'Live feedback off.' : 'Live feedback on.');
 }
 els.pause.addEventListener('click', toggleLive);
-els.checkBtn.addEventListener('click', checkNow);
+els.checkBtn.addEventListener('click', () => { unlockSpeech(); checkNow(); });
 els.voiceBtn.addEventListener('click', () => { runVoiceTest(); });
 els.playBtn.addEventListener('click', () => { if (S.testing) return; els.voiceStatus.textContent = 'Playing back…'; playClip().then(() => { els.voiceStatus.textContent = 'Playback finished.'; }); });
 /* Shortcut keys: plain letters, or Alt+Shift+letter for screen readers that keep plain letters.
@@ -1593,7 +1622,7 @@ document.addEventListener('keydown', (e) => {
   switch (e.code) {
     case 'KeyS': e.preventDefault(); unlockSpeech(); if (S.stream) stop(); else start(); break;
     case 'KeyL': case 'KeyM': e.preventDefault(); toggleLive(); break;
-    case 'KeyC': case 'KeyN': e.preventDefault(); if (!busy()) checkNow(); break;
+    case 'KeyC': case 'KeyN': e.preventDefault(); if (!busy()) { unlockSpeech(); checkNow(); } break;
     case 'KeyD': e.preventDefault(); if (!busy()) { unlockSpeech(); describeSetup(); } break;
     case 'KeyV': if (!ADVANCED_MIC) break; e.preventDefault(); unlockSpeech(); { const ad = document.getElementById('advanced'); if (ad) ad.open = true; } runVoiceTest(); break;
     default: break;
