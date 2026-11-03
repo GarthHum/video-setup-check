@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Check My Camera</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a6a6e">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Cstyle%3E.c%7Bstroke:%230a6a6e%7D.f%7Bfill:%230a6a6e%7D.r%7Bstroke:%23fff%7D%40media%20(prefers-color-scheme:dark)%7B.c%7Bstroke:%2363d2d0%7D.f%7Bfill:%2363d2d0%7D.r%7Bstroke:%23151d1d%7D%7D%3C/style%3E%3Cg%20fill=%22none%22%20class=%22c%22%20stroke-width=%224%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M6%2018V8a2%202%200%200%201%202-2h10M46%206h10a2%202%200%200%201%202%202v10M58%2046v10a2%202%200%200%201-2%202H46M18%2058H8a2%202%200%200%201-2-2V46%22/%3E%3Ccircle%20cx=%2231%22%20cy=%2223%22%20r=%228%22/%3E%3Cpath%20d=%22M15%2049c0-9%207-13%2016-13s16%204%2016%2013%22/%3E%3C/g%3E%3Ccircle%20class=%22f%20r%22%20cx=%2249%22%20cy=%2249%22%20r=%2210%22%20stroke-width=%223%22/%3E%3Cpath%20d=%22M44.5%2049.2l3.5%203.5%206-7%22%20fill=%22none%22%20stroke=%22%23fff%22%20stroke-width=%223%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
 <style>
@@ -374,6 +376,14 @@
         </select>
       </div>
       <div class="field" style="max-width:20rem; margin-top:1rem">
+        <label for="speakVia">Advice is spoken by</label>
+        <select id="speakVia">
+          <option value="browser" selected>The browser voice</option>
+          <option value="reader">My screen reader</option>
+        </select>
+        <p class="small" id="speakViaHelp" style="margin:.25rem 0 0">Choose My screen reader if you use TalkBack or VoiceOver and the two voices talk over each other. The advice is then announced to your screen reader instead.</p>
+      </div>
+      <div class="field" style="max-width:20rem; margin-top:1rem">
         <label for="speechRate">Browser voice speed</label>
         <select id="speechRate">
           <option value="0.8">Slower</option>
@@ -484,7 +494,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
-  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null,
+  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null, via: 'browser',
 };
 
 /* ---------- Announcements ---------- */
@@ -538,7 +548,7 @@ function unlockSpeech() {
   } catch (e) { /* ignore */ }
 }
 function speak(text, interrupt) {
-  if (IOS) return liveSay(text);
+  if (IOS || S.via === 'reader') return liveSay(text);
   return new Promise((resolve) => {
     if (!synth) { resolve(); return; }
     let finished = false;
@@ -650,6 +660,7 @@ function explainError(e) {
 async function openMedia(camId, micId, retried) {
   const video = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
   if (camId) video.deviceId = { exact: camId };
+  else video.facingMode = { ideal: 'user' };   /* phones: start with the front camera */
   const attempts = [{ video, audio: false, kind: 'video' }];
   let firstErr = null;
   for (const a of attempts) {
@@ -762,6 +773,7 @@ async function attach({ stream, kind, err }) {
   }
   S.startedAt = Date.now();
   watchFrames();
+  keepAwake(true);
   if (S.audioTrack) setupAudio(S.audioTrack);
 
   await refreshDevices();
@@ -832,6 +844,7 @@ async function openMic() {
 }
 
 function stopStream() {
+  keepAwake(false);
   clearInterval(S.timers.detect);
   clearInterval(S.timers.audio);
   clearInterval(S.timers.evaluate);
@@ -989,6 +1002,18 @@ function measuredFps() {
   if (recent.length < 12 || now - recent[0] < 1500) return null;
   return (recent.length - 1) / ((recent[recent.length - 1] - recent[0]) / 1000);
 }
+/* Asks the phone to keep the screen on while the camera is running. It is released when the camera stops. */
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (!on) { if (wakeLock) { await wakeLock.release(); wakeLock = null; } return; }
+    if ('wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) { /* not allowed or not supported: carry on */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.stream) keepAwake(true); });
 function watchFrames() {
   const v = els.video;
   if (!v.requestVideoFrameCallback) return;
@@ -1659,7 +1684,7 @@ function checkNow() {
   /* The result is shown as text and spoken by the browser voice. Focus stays where it is. */
   const out = (text) => {
     els.checkResult.textContent = text;
-    if (!synth && !IOS) els.checkResult.focus();   /* no browser voice here, so the screen reader reads it instead */
+    if (!synth && !IOS && S.via !== 'reader') els.checkResult.focus();   /* no browser voice here, so the screen reader reads it instead */
     else say(text);
   };
   if (!S.stream) { out('The camera is not running. Press Start first.'); return; }
@@ -1787,6 +1812,17 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   };
   themeSel.addEventListener('change', () => { setTheme(themeSel.value); status.textContent = themeSel.options[themeSel.selectedIndex].text + ' appearance.'; });
   const rateSel = document.getElementById('speechRate'), rateHelp = document.getElementById('speechRateHelp');
+  const viaSel = document.getElementById('speakVia');
+  if (IOS) {
+    viaSel.value = 'reader'; viaSel.disabled = true;
+    document.getElementById('speakViaHelp').textContent = 'On an iPhone or iPad the advice is always announced to VoiceOver.';
+  }
+  viaSel.addEventListener('change', () => {
+    S.via = viaSel.value === 'reader' ? 'reader' : 'browser';
+    rateSel.disabled = IOS || S.via === 'reader';
+    unlockSpeech();
+    say(S.via === 'reader' ? 'The advice will now be announced to your screen reader.' : 'The advice will now be spoken by the browser voice.');
+  });
   if (IOS) {
     rateSel.disabled = true;
     rateHelp.textContent = 'On an iPhone or iPad the advice is read by VoiceOver, so change its speed in the VoiceOver settings.';
@@ -1800,7 +1836,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   /* Saving: the one thing this page ever stores, and only when asked. */
   const KEY = 'checkmycamera.settings';
   document.getElementById('saveBtn').addEventListener('click', () => {
-    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, plainKeys: S.plainKeys, values: {}, off: {} };
+    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, plainKeys: S.plainKeys, via: S.via, values: {}, off: {} };
     for (const d of SETTING_DEFS) data.values[d.key] = getSetting(d.key);
     for (const [id] of FEEDBACK_TYPES) if (OFF[id]) data.off[id] = true;
     try { localStorage.setItem(KEY, JSON.stringify(data)); status.textContent = 'Settings saved on this device.'; }
@@ -1824,6 +1860,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
       if (['relaxed', 'balanced', 'picky', 'custom'].includes(data.preset)) presetSel.value = data.preset;
       setTheme(data.theme);
       if (data.plainKeys === false) setPlain(false);
+      if (data.via === 'reader' && !IOS) { S.via = 'reader'; viaSel.value = 'reader'; rateSel.disabled = true; }
       refresh();
     }
   } catch (e) { /* no saved settings, or storage is blocked */ }

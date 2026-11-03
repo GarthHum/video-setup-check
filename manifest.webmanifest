@@ -1,0 +1,14 @@
+{
+  "name": "Check My Camera",
+  "short_name": "Check Camera",
+  "description": "Check your framing and lighting before you record or join a call.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#edf1f1",
+  "theme_color": "#0a6a6e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
