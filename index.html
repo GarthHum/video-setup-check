@@ -240,7 +240,7 @@
       <div class="control-row">
         <button type="button" id="startBtn" class="btn" aria-keyshortcuts="S">Start camera</button>
         <button type="button" id="checkBtn" class="btn secondary" aria-keyshortcuts="C" disabled>Check my picture now</button>
-        <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="L">Start live voice feedback</button>
+        <button type="button" id="pauseBtn" class="btn secondary" aria-keyshortcuts="L" disabled>Start live voice feedback</button>
         <button type="button" id="describeBtn" class="btn secondary" aria-keyshortcuts="D" disabled>Describe my setup</button>
         <button type="button" id="settingsBtn" class="btn secondary" aria-haspopup="dialog">Settings</button>
       </div>
@@ -784,6 +784,7 @@ async function attach({ stream, kind, err }) {
   els.previewPanel.hidden = false;
   els.describe.disabled = false;
   els.checkBtn.disabled = !S.videoTrack;
+  els.pause.disabled = !S.videoTrack;
   S.timers.evaluate = setInterval(evaluateAndRender, CFG.evaluateEveryMs);
   if (S.videoTrack) {
     S.timers.detect = setInterval(tick, CFG.detectEveryMs);
@@ -875,6 +876,9 @@ function resetUi() {
   els.start.disabled = false;
   els.describe.disabled = true;
   els.checkBtn.disabled = true;
+  S.paused = true;
+  els.pause.disabled = true;
+  els.pause.textContent = 'Start live voice feedback';
   els.checkResult.textContent = '';
   els.voiceBtn.disabled = false;
   els.voiceStatus.textContent = '';
@@ -1879,6 +1883,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
 els.start.addEventListener('click', () => { unlockSpeech(); if (S.stream) stop(); else start(); });
 els.describe.addEventListener('click', () => { unlockSpeech(); describeSetup(); });
 function toggleLive() {
+  if (!S.stream || !S.videoTrack) return;   /* only while the camera is running */
   unlockSpeech();
   S.paused = !S.paused;
   els.pause.textContent = S.paused ? 'Start live voice feedback' : 'Stop live voice feedback';
