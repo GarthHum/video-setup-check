@@ -340,7 +340,7 @@
           <li>L turns live voice feedback on or off. M does the same.</li>
           <li>D describes your setup as text.</li>
         </ul>
-        <p>Every shortcut also works with Alt and Shift held together. On Windows press Alt plus Shift plus the letter, for example Alt plus Shift plus C. On a Mac press Option plus Shift plus the letter, for example Option plus Shift plus C. Use these if your screen reader keeps the plain letters for itself, which NVDA and JAWS do in browse mode. You can also switch to focus mode and use the plain letters. VoiceOver on a Mac passes plain letters through unless Quick Nav is on. The buttons at the top of the page always work too. Phones and tablets have no keyboard shortcuts, so use the buttons.</p>
+        <p>If the single letters clash with your screen reader, switch off Single-letter shortcut keys in Settings. Every shortcut also works with Alt and Shift held together. On Windows press Alt plus Shift plus the letter, for example Alt plus Shift plus C. On a Mac press Option plus Shift plus the letter, for example Option plus Shift plus C. Use these if your screen reader keeps the plain letters for itself, which NVDA and JAWS do in browse mode. You can also switch to focus mode and use the plain letters. VoiceOver on a Mac passes plain letters through unless Quick Nav is on. The buttons at the top of the page always work too. Phones and tablets have no keyboard shortcuts, so use the buttons.</p>
       </details>
       <details>
         <summary>Supported browsers</summary>
@@ -380,6 +380,8 @@
         </select>
         <p class="small" id="speechRateHelp" style="margin:.25rem 0 0">Changes the voice that speaks the advice. It does not change your screen reader.</p>
       </div>
+      <label class="opt" style="display:block; margin-top:1rem"><input type="checkbox" id="plainKeys" checked> Single-letter shortcut keys (S, C, L and D)</label>
+      <p class="small" style="margin:.25rem 0 0">Switch this off if letter keys clash with your screen reader. The Alt and Shift shortcuts, or Option and Shift on a Mac, keep working.</p>
       <fieldset id="feedbackTypes"><legend>Give feedback on</legend></fieldset>
       <div class="control-row">
         <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
@@ -465,7 +467,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
-  paused: true, utter: null, rate: 1,
+  paused: true, utter: null, rate: 1, plainKeys: true,
 };
 
 /* ---------- Announcements ---------- */
@@ -1624,6 +1626,13 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     evaluateAndRender();
   });
   refresh();
+  const plainBox = document.getElementById('plainKeys'), keysHint = document.getElementById('keysHint');
+  const KEYS_ON = keysHint.textContent;
+  const setPlain = (on) => {
+    S.plainKeys = on; plainBox.checked = on;
+    keysHint.textContent = on ? KEYS_ON : 'Shortcut keys: hold Alt and Shift with S to start or stop, C to check my picture now, L for live voice feedback, D to describe my setup. On a Mac use Option and Shift.';
+  };
+  plainBox.addEventListener('change', () => { setPlain(plainBox.checked); status.textContent = plainBox.checked ? 'Single-letter shortcut keys on.' : 'Single-letter shortcut keys off. Alt and Shift shortcuts still work.'; });
   const themeSel = document.getElementById('theme');
   const setTheme = (v) => {
     if (v === 'light' || v === 'dark') document.documentElement.setAttribute('data-theme', v);
@@ -1645,7 +1654,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   /* Saving: the one thing this page ever stores, and only when asked. */
   const KEY = 'checkmycamera.settings';
   document.getElementById('saveBtn').addEventListener('click', () => {
-    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, values: {}, off: {} };
+    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, plainKeys: S.plainKeys, values: {}, off: {} };
     for (const d of SETTING_DEFS) data.values[d.key] = getSetting(d.key);
     for (const [id] of FEEDBACK_TYPES) if (OFF[id]) data.off[id] = true;
     try { localStorage.setItem(KEY, JSON.stringify(data)); status.textContent = 'Settings saved on this device.'; }
@@ -1668,6 +1677,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
       if (typeof data.rate === 'number' && data.rate > 0 && !IOS) { S.rate = data.rate; if ([...rateSel.options].some((o) => o.value === String(data.rate))) rateSel.value = String(data.rate); }
       if (['relaxed', 'balanced', 'picky', 'custom'].includes(data.preset)) presetSel.value = data.preset;
       setTheme(data.theme);
+      if (data.plainKeys === false) setPlain(false);
       refresh();
     }
   } catch (e) { /* no saved settings, or storage is blocked */ }
@@ -1706,6 +1716,7 @@ document.addEventListener('keydown', (e) => {
   const t = e.target;
   const tag = t && t.tagName;
   if (t && t.closest && t.closest('dialog')) return;   /* typing inside the settings window */
+  if (plain && !S.plainKeys) return;
   if (plain && (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable))) return;
   const busy = () => { if (S.testing) { els.voiceStatus.textContent = 'Please wait until the voice test finishes.'; return true; } return false; };
   switch (e.code) {
