@@ -339,6 +339,12 @@
         <p>The advice can be spoken in two ways, and you can choose in Settings. The browser voice is the page's own voice, and it is the default on computers and Android. My screen reader announces the advice through VoiceOver, TalkBack, NVDA or JAWS, and it is the default on an iPhone or iPad, because the browser voice is sometimes silent there. If your screen reader and the browser voice talk over each other, choose My screen reader. If you hear nothing, check that your volume is up. The live voice speaks the most important problem first. In Settings you can ask for up to three problems together, which is experimental.</p>
       </details>
       <details>
+        <summary>Camera tilt</summary>
+        <p>Tilt advice can say whether it is your head or your camera that is crooked. This is off until you ask for it in Settings, under Camera tilt.</p>
+        <p>On a phone or tablet, Use phone motion sensors reads the device's tilt sensors. A Camera angle row then says if the phone is upright and level, and if not, which way to tip the top of it. On an iPhone the browser asks permission once. The readings stay on your device.</p>
+        <p>On a computer, Estimate camera tilt from the room is experimental. It looks for door frames, windows and shelves behind you and checks whether their vertical lines lean. It needs a room with straight lines, and it cannot tell a tilted camera from a room that is itself crooked.</p>
+      </details>
+      <details>
         <summary>Shortcut keys</summary>
         <p>These keys work anywhere on the page, except while the Camera list or the Settings window has focus.</p>
         <ul>
@@ -405,6 +411,11 @@
       </div>
       <label class="opt" style="display:block; margin-top:1rem"><input type="checkbox" id="plainKeys" checked> Single-letter shortcut keys (S, C, L and D)</label>
       <p class="small" style="margin:.25rem 0 0">Switch this off if letter keys clash with your screen reader. The Alt and Shift shortcuts, or Option and Shift on a Mac, keep working.</p>
+      <fieldset id="tiltSources"><legend>Camera tilt</legend>
+        <div class="control-row"><button type="button" id="motionBtn" class="btn secondary">Use phone motion sensors</button></div>
+        <label class="opt" style="display:block; margin-top:.75rem"><input type="checkbox" id="roomTilt"> Estimate camera tilt from the room (experimental)</label>
+        <p class="small" style="margin:.25rem 0 0">On a phone or tablet, the motion sensors tell the page if the phone is upright and level. On an iPhone this asks permission once. On a computer, the estimate looks at door frames, windows and shelves behind you, so it only works if the room has straight vertical lines.</p>
+      </fieldset>
       <fieldset id="feedbackTypes"><legend>Give feedback on</legend></fieldset>
       <div class="control-row">
         <button type="button" id="levelBtn" class="btn secondary">Set my up and down level</button>
@@ -445,6 +456,8 @@ const CFG = {
   lowGap: 0.25,               // empty space above the head minus empty space below the chin, as a fraction of picture height
   bottomMax: 0.92,
   tiltMaxDeg: 10,
+  camPitchOk: 8, camRollOk: 3,   // phone sensors: degrees the camera may lean back or forward, or roll sideways
+  roomRollOk: 2.5,               // room edges: degrees the vertical lines may lean
   yawOk: 0.2, yawFar: 0.4,
   /* Up or down: where the nose tip sits between the eyes and the mouth, 0 at the eyes and 1 at the mouth.
      Roughly 0.53 when the head is level, from testing. Lower means the chin is raised, higher means it is lowered. */
@@ -503,7 +516,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
-  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null, via: IOS ? 'reader' : 'browser', liveCount: 1,
+  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null, motion: { on: false, got: false, e: null, rho: null, at: 0 }, roomOn: false, via: IOS ? 'reader' : 'browser', liveCount: 1,
 };
 
 /* ---------- Announcements ---------- */
@@ -579,7 +592,7 @@ function say(text, opts) {
 /* ---------- Rows ---------- */
 const PICTURE_ROWS = [
   ['camera', 'Camera'], ['face', 'Face'], ['center', 'Centering'], ['height', 'Height in frame'],
-  ['distance', 'Distance'], ['facing', 'Facing the camera'], ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'], ['lightColour', 'Colour of the light'],
+  ['distance', 'Distance'], ['facing', 'Facing the camera'], ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['camAngle', 'Camera angle'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'], ['lightColour', 'Colour of the light'],
 ];
 const SOUND_ROWS = [['voice', 'Speaking level'], ['noise', 'Background noise'], ['clip', 'Distortion']];
 const STATE_LABEL = { good: 'Good', adjust: 'Adjust', unknown: 'Unknown', untested: 'Not tested' };
@@ -621,6 +634,7 @@ function buildRows(list, defs) {
   }
 }
 buildRows(els.pictureList, PICTURE_ROWS);
+rowEls.camAngle.li.hidden = true;   /* shown only once a tilt source is switched on in Settings */
 buildRows(els.soundList, SOUND_ROWS);
 
 function setRow(id, state, text) {
@@ -1100,6 +1114,9 @@ function sampleLuma(face) {
     }
   }
   const pctile = (q) => { if (!F.n) return null; let c = 0; const target = q * F.n; for (let i = 0; i < 256; i++) { c += hist[i]; if (c >= target) return i; } return 255; };
+  let room = null;
+  if (S.roomOn && face) room = roomRollFromPixels(d, W, H, (x, y) => x >= ex0 && x <= ex1 && y >= ey0);
+  else if (S.roomOn) room = roomRollFromPixels(d, W, H, null);
   const mean = (s) => (s.n ? s.l / s.n : null);
   const rgb = (s) => (s.n ? { r: s.r / s.n, g: s.g / s.n, b: s.b / s.n } : null);
   return {
@@ -1108,6 +1125,7 @@ function sampleLuma(face) {
     bg: mean(B), bgLeft: mean(BL), bgRight: mean(BR),
     faceClip: F.n ? F.clip / F.n : null, faceCrush: F.n ? F.crush / F.n : null, bgClip: B.n ? B.clip / B.n : null,
     p10: pctile(0.1), p50: pctile(0.5), p90: pctile(0.9),
+    roomRoll: room ? room.angle : null,
     rgb: rgb(F), rgbL: rgb(FL), rgbR: rgb(FR),
   };
 }
@@ -1425,6 +1443,80 @@ function currentFace() {
   };
 }
 
+/* ---------- Camera angle: phone motion sensors, or the room's vertical lines ---------- */
+const PHONE = (() => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })();
+/* World 'up' as seen in the phone's own axes, from its tilt readings, gives how far the camera leans and rolls.
+   e: degrees the camera looks above (+) or below (-) the horizon. rho: roll, positive when the top of the phone
+   leans toward the user's left. Roll is not defined when the phone is nearly flat. */
+function orientationToCamera(beta, gamma, angle, front) {
+  const b = beta * Math.PI / 180, g = gamma * Math.PI / 180, a = (angle || 0) * Math.PI / 180;
+  const ux = -Math.cos(b) * Math.sin(g), uy = Math.sin(b), uz = Math.cos(b) * Math.cos(g);
+  const e = Math.asin(Math.max(-1, Math.min(1, front ? uz : -uz))) * 180 / Math.PI;
+  const R = ux * Math.cos(a) - uy * Math.sin(a), U = ux * Math.sin(a) + uy * Math.cos(a);
+  const rho = Math.hypot(R, U) > 0.5 ? Math.atan2(R, U) * 180 / Math.PI : null;
+  return { e, rho };
+}
+function isFrontCamera() { const s = S.videoTrack && S.videoTrack.getSettings ? S.videoTrack.getSettings() : {}; return s.facingMode !== 'environment'; }
+function onOrient(ev) {
+  if (ev.beta == null || ev.gamma == null) return;
+  const ang = (window.screen && screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0);
+  const r = orientationToCamera(ev.beta, ev.gamma, ang, isFrontCamera());
+  const m = S.motion, k = m.got ? 0.15 : 1;
+  m.e = m.e === null ? r.e : m.e + k * (r.e - m.e);
+  if (r.rho === null) m.rho = null; else m.rho = (m.rho === null ? r.rho : m.rho + k * (r.rho - m.rho));
+  m.got = true; m.at = Date.now();
+}
+const motionLive = () => S.motion.on && S.motion.got && Date.now() - S.motion.at < 2000;
+function syncCamRow() { const r = rowEls.camAngle; if (r) r.li.hidden = !(motionLive() || S.motion.on || S.roomOn) || !!OFF.camAngle; }
+/* Finds the lean of the near-vertical edges (door frames, windows, shelves) in the part of the picture behind you.
+   Positive means the tops of the lines lean to the right in the raw picture. */
+function roomRollFromPixels(d, W, H, skip) {
+  const g = new Uint8Array(W * H);
+  for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 0.2126 + d[i + 1] * 0.7152 + d[i + 2] * 0.0722) | 0;
+  const LIM = 20, BIN = 0.5, nb = Math.round(2 * LIM / BIN) + 1, hist = new Float64Array(nb);
+  let strong = 0, nv = 0;
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
+      if (skip && skip(x, y)) continue;
+      const i = y * W + x;
+      const gx = -g[i - W - 1] - 2 * g[i - 1] - g[i + W - 1] + g[i - W + 1] + 2 * g[i + 1] + g[i + W + 1];
+      const gy = -g[i - W - 1] - 2 * g[i - W] - g[i - W + 1] + g[i + W - 1] + 2 * g[i + W] + g[i + W + 1];
+      const m = Math.hypot(gx, gy);
+      if (m < 200) continue;
+      strong++;
+      let tx = -gy, ty = gx;
+      if (ty > 0) { tx = -tx; ty = -ty; }
+      const ang = Math.atan2(tx, -ty) * 180 / Math.PI;
+      if (Math.abs(ang) > LIM) continue;
+      nv++;
+      hist[Math.round((ang + LIM) / BIN)] += m;
+    }
+  }
+  if (nv < 120) return null;
+  let best = -1, bi = 0;
+  for (let i = 0; i < nb; i++) {
+    let s = 0; for (let k = -2; k <= 2; k++) if (hist[i + k] !== undefined) s += hist[i + k];
+    if (s > best) { best = s; bi = i; }
+  }
+  let tot = 0, near = 0, wsum = 0;
+  for (let i = 0; i < nb; i++) { tot += hist[i]; if (Math.abs(i - bi) <= 3) { near += hist[i]; wsum += hist[i] * (i * BIN - LIM); } }
+  if (!near || near / tot < 0.2) return null;
+  return { angle: wsum / near, conf: near / tot, count: nv };
+}
+/* Where the camera is leaning, from whichever source is on. tau is the lean of the picture itself (clockwise positive,
+   as in the raw picture), rho the roll as the user would describe it, e the up or down lean. */
+function cameraAngles() {
+  if (motionLive()) {
+    const m = S.motion, front = isFrontCamera();
+    return { src: 'phone', e: m.e, rho: m.rho, tau: m.rho === null ? null : (front ? -m.rho : m.rho) };
+  }
+  if (S.roomOn) {
+    const a = S.samples.slice(-CFG.window).map((s) => (s.luma ? s.luma.roomRoll : null)).filter(Number.isFinite);
+    if (a.length >= 3) { const tau = median(a); return { src: 'room', e: null, tau, rho: -tau }; }
+    return { src: 'room', e: null, tau: null, rho: null };
+  }
+  return null;
+}
 const OFF = {};   /* feedback types switched off in Advanced settings */
 function evaluatePicture() { return evaluatePictureAll().filter((r) => !OFF[r.id]); }
 function evaluatePictureAll() {
@@ -1448,6 +1540,8 @@ function evaluatePictureAll() {
   }
 
   const f = currentFace();
+  const cam = cameraAngles();
+  const noun = PHONE ? 'phone' : 'camera';
   const faceDeps = ['center', 'height', 'distance', 'facing', 'tilt', 'pitch'];
   /* colour is judged with the lighting rows, below */
   if (S.detectorState === 'idle' || S.detectorState === 'loading') {
@@ -1497,6 +1591,9 @@ function evaluatePictureAll() {
     } else push('facing', 'good', 'You are facing the camera.', 2.5);
 
     if (!Number.isFinite(f.tilt)) push('tilt', 'unknown', 'Tilt cannot be measured with this face detector.', 99);
+    else if (Math.abs(f.tilt) > CFG.tiltMaxDeg && cam && cam.tau !== null && Math.abs(cam.tau) > CFG.camRollOk && Math.abs(f.tilt - cam.tau) <= CFG.tiltMaxDeg) {
+      push('tilt', 'adjust', 'Your picture is tilted about ' + Math.round(Math.abs(f.tilt)) + ' degrees because the ' + (cam.src === 'phone' ? 'phone' : 'camera') + ' is tilted, not your head. Straighten the ' + (cam.src === 'phone' ? 'phone' : 'camera') + '.', 5, 'tilt:cam');
+    }
     else if (Math.abs(f.tilt) > CFG.tiltMaxDeg) {
       const low = f.tilt > 0 ? 'left' : 'right';      /* the side your head is leaning toward */
       const fix = f.tilt > 0 ? 'right' : 'left';
@@ -1506,9 +1603,34 @@ function evaluatePictureAll() {
 
     const dbg = /debug/.test(location.hash) && Number.isFinite(f.pitch) ? ' (measure ' + f.pitch.toFixed(2) + ')' : '';
     if (!Number.isFinite(f.pitch)) push('pitch', 'unknown', 'Looking up or down cannot be measured with this face detector.', 99);
-    else if (f.pitch < CFG.pitchLo) push('pitch', 'adjust', 'Your chin is raised, so you are looking above the camera. Lower your chin a little, or raise the camera.' + dbg, 3, 'pitch:up');
-    else if (f.pitch > CFG.pitchHi) push('pitch', 'adjust', 'Your head is angled down, so you are looking below the camera. Lift your chin a little, or lower the camera.' + dbg, 3, 'pitch:down');
+    else if (f.pitch < CFG.pitchLo) {
+      if (cam && cam.e !== null && cam.e > CFG.camPitchOk) push('pitch', 'adjust', 'You appear to look above the camera because your phone is leaning back. Tip the top of the phone toward you.' + dbg, 3, 'pitch:up:phone');
+      else push('pitch', 'adjust', 'Your chin is raised, so you are looking above the camera. Lower your chin a little, or raise the ' + noun + '.' + dbg, 3, 'pitch:up');
+    } else if (f.pitch > CFG.pitchHi) {
+      if (cam && cam.e !== null && cam.e < -CFG.camPitchOk) push('pitch', 'adjust', 'You appear to look below the camera because your phone is leaning forward. Tip the top of the phone away from you.' + dbg, 3, 'pitch:down:phone');
+      else push('pitch', 'adjust', 'Your head is angled down, so you are looking below the camera. Lift your chin a little, or lower the ' + noun + '.' + dbg, 3, 'pitch:down');
+    }
     else push('pitch', 'good', 'You are looking straight at the camera, not above or below it.' + dbg, 3);
+  }
+
+  if (cam) {
+    const parts = [];
+    let key = 'cam';
+    if (cam.e !== null && Math.abs(cam.e) > CFG.camPitchOk) {
+      parts.push(cam.e > 0 ? 'Your phone is leaning back about ' + Math.round(cam.e) + ' degrees. Tip the top of the phone toward you.' : 'Your phone is leaning forward about ' + Math.round(-cam.e) + ' degrees. Tip the top of the phone away from you.');
+      key += ':pitch' + (cam.e > 0 ? 'up' : 'down');
+    }
+    const rollLimit = cam.src === 'phone' ? CFG.camRollOk : CFG.roomRollOk;
+    if (cam.rho !== null && Math.abs(cam.rho) > rollLimit) {
+      const n = cam.src === 'phone' ? 'phone' : 'camera or screen';
+      const top = cam.rho > 0 ? 'left' : 'right', fix = cam.rho > 0 ? 'right' : 'left';
+      parts.push((cam.src === 'room' ? 'The vertical lines in the room lean about ' + Math.abs(cam.tau).toFixed(0) + ' degrees, so the camera is probably tilted. ' : 'Your phone is tilted about ' + Math.round(Math.abs(cam.rho)) + ' degrees, with the top toward your ' + top + '. ') + 'Tip the top of the ' + n + ' to your ' + fix + '.');
+      key += ':roll' + top;
+    }
+    if (parts.length) push('camAngle', 'adjust', parts.join(' '), 3.2, key);
+    else if (cam.src === 'room' && cam.tau === null) push('camAngle', 'unknown', 'Not enough straight lines in the room to tell if the camera is level.', 99);
+    else if (cam.src === 'room') push('camAngle', 'good', 'The vertical lines in the room look straight, so the camera looks level.', 3.2);
+    else push('camAngle', 'good', 'Your phone is upright and level.', 3.2);
   }
 
   const lumas = S.samples.slice(-CFG.window).map((s) => (s.luma ? s.luma.frame : NaN)).filter(Number.isFinite);
@@ -1753,7 +1875,7 @@ const getSetting = (k) => (k === 'faceMin' ? CFG.faceHeightGood[0] : k === 'face
 const putSetting = (k, v) => { if (k === 'faceMin') CFG.faceHeightGood[0] = v; else if (k === 'faceMax') CFG.faceHeightGood[1] = v; else CFG[k] = v; };
 PRESETS.balanced = Object.fromEntries(SETTING_DEFS.map((d) => [d.key, getSetting(d.key)]));
 const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Height in the picture'], ['distance', 'Distance'], ['facing', 'Facing the camera'],
-  ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'], ['lightColour', 'Colour of the light']];
+  ['tilt', 'Tilt'], ['pitch', 'Up or down'], ['camAngle', 'Camera angle'], ['lightFace', 'Light on your face'], ['lightBack', 'Light behind you'], ['lightColour', 'Colour of the light']];
 (() => {
   const presetSel = document.getElementById('preset'), fields = document.getElementById('settingsFields');
   const status = document.getElementById('settingsStatus'), box = document.getElementById('feedbackTypes');
@@ -1766,6 +1888,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     c.addEventListener('change', () => {
       OFF[id] = !c.checked;
       if (rowEls[id]) rowEls[id].li.hidden = !c.checked;
+      if (id === 'camAngle') syncCamRow();
       if (S.stream) evaluateAndRender();
     });
     l.append(c, ' ' + name);
@@ -1797,6 +1920,41 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
     status.textContent = presetSel.options[presetSel.selectedIndex].text + ' settings in use.';
   });
   document.getElementById('resetBtn').addEventListener('click', () => { apply('balanced'); S.lightRef = null; status.textContent = 'Reset to Balanced. Your lighting reference is cleared.'; });
+  const motionBtn = document.getElementById('motionBtn');
+  motionBtn.addEventListener('click', async () => {
+    if (S.motion.on) {
+      window.removeEventListener('deviceorientation', onOrient);
+      S.motion = { on: false, got: false, e: null, rho: null, at: 0 };
+      motionBtn.textContent = 'Use phone motion sensors';
+      status.textContent = 'Phone motion sensors off.'; syncCamRow(); return;
+    }
+    if (!('DeviceOrientationEvent' in window)) { status.textContent = 'This browser does not give web pages motion sensor readings.'; return; }
+    try {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const r = await DeviceOrientationEvent.requestPermission();
+        if (r !== 'granted') { status.textContent = 'Motion permission was not given, so the page cannot read the phone angle.'; return; }
+      }
+    } catch (e) { status.textContent = 'The page could not ask for motion permission.'; return; }
+    S.motion = { on: true, got: false, e: null, rho: null, at: 0 };
+    window.addEventListener('deviceorientation', onOrient);
+    status.textContent = 'Checking for motion sensor readings.';
+    await sleep(1500);
+    if (!S.motion.got) {
+      window.removeEventListener('deviceorientation', onOrient);
+      S.motion.on = false; syncCamRow();
+      status.textContent = 'No readings arrived, so this device probably has no motion sensor the page can use.';
+      return;
+    }
+    motionBtn.textContent = 'Stop using phone motion sensors';
+    status.textContent = 'Phone motion sensors on. A Camera angle row now shows whether the phone is upright and level.';
+    syncCamRow(); if (S.stream) evaluateAndRender();
+  });
+  const roomBox = document.getElementById('roomTilt');
+  roomBox.addEventListener('change', () => {
+    S.roomOn = roomBox.checked; syncCamRow();
+    status.textContent = S.roomOn ? 'Estimating camera tilt from the room. A Camera angle row now shows the result.' : 'Room tilt estimate off.';
+    if (S.stream) evaluateAndRender();
+  });
   document.getElementById('lightBtn').addEventListener('click', () => {
     const f = S.stream ? currentFace() : null;
     if (!f || !f.found || !Number.isFinite(f.lMed)) { status.textContent = 'Start the camera, sit where your lighting is as good as you can get it, then press this again.'; return; }
@@ -1870,6 +2028,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
         const off = !!(data.off && data.off[id]);
         OFF[id] = off; boxes[id].checked = !off;
         if (rowEls[id]) rowEls[id].li.hidden = off;
+        if (id === 'camAngle') syncCamRow();
       }
       if (typeof data.rate === 'number' && data.rate > 0) { S.rate = data.rate; if ([...rateSel.options].some((o) => o.value === String(data.rate))) rateSel.value = String(data.rate); }
       if (['relaxed', 'balanced', 'picky', 'custom'].includes(data.preset)) presetSel.value = data.preset;
