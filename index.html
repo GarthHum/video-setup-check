@@ -330,13 +330,13 @@
       <details>
         <summary>How the checks work</summary>
         <p>A small face detector runs on your computer to find your face. Centering, height and distance come from where the face sits in the picture. Distance compares the height of your face with the shorter side of the picture, so it works the same whether the picture is wide, like a laptop camera, or tall, like a phone held upright. Facing the camera compares the position of your nose with your eyes, so it measures which way your head is turned, not where your eyes are looking. Lighting compares the brightness of your face with the area behind you, so it works across skin tones. Only very dark or very bright faces are flagged on their own.</p>
-        <p>These checks are guides, not rules. If a result looks wrong for your room, trust your ears and your recording.</p>
+        <p>These checks are guides, not rules. If a result looks wrong for your room, trust your own judgement and how you look in a test recording.</p>
       </details>
       <details>
         <summary>Voice feedback</summary>
         <p>There are two ways to get advice on your picture. Press Check my picture now, or the C key, and the advice appears as text just below the buttons and is spoken once, and focus stays where it is. Or press Start live voice feedback, or the L key, and the page speaks each adjustment as you move, such as "Move a little to your right." If the advice has not been followed, it repeats about every twelve seconds. Stop live voice feedback turns it off again. Live voice feedback is off until you turn it on.</p>
         <p>Describe my setup shows the summary of your picture as text and moves your screen reader onto it. Nothing is spoken by the page for this.</p>
-        <p>On an iPhone or iPad, live voice feedback is read by VoiceOver instead of the browser voice, so turn VoiceOver on to hear it. On a computer the live voice is separate from your screen reader, so with a screen reader running you will hear both. If you hear nothing, check that your volume is up.</p>
+        <p>The advice can be spoken in two ways, and you can choose in Settings. The browser voice is the page's own voice, and it is the default on computers and Android. My screen reader announces the advice through VoiceOver, TalkBack, NVDA or JAWS, and it is the default on an iPhone or iPad, because the browser voice is sometimes silent there. If your screen reader and the browser voice talk over each other, choose My screen reader. If you hear nothing, check that your volume is up. The live voice speaks the most important problem first. In Settings you can ask for up to three problems together, which is experimental.</p>
       </details>
       <details>
         <summary>Shortcut keys</summary>
@@ -373,6 +373,14 @@
           <option value="auto" selected>Match my device</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="field" style="max-width:20rem; margin-top:1rem">
+        <label for="liveCount">Live voice feedback gives (experimental)</label>
+        <select id="liveCount">
+          <option value="1" selected>One issue at a time</option>
+          <option value="2">Up to two issues together</option>
+          <option value="3">Up to three issues together</option>
         </select>
       </div>
       <div class="field" style="max-width:20rem; margin-top:1rem">
@@ -485,6 +493,7 @@ const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(q * (so
 const fmtDb = (v) => Math.round(v).toString().replace('-', '−') + ' dB';
 
 /* ---------- State ---------- */
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const S = {
   stream: null, videoTrack: null, audioTrack: null, camInfo: null,
   audioCtx: null, analyser: null, srcNode: null, buf: null,
@@ -494,7 +503,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
-  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null, via: 'browser',
+  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null, via: IOS ? 'reader' : 'browser', liveCount: 1,
 };
 
 /* ---------- Announcements ---------- */
@@ -502,10 +511,9 @@ const S = {
    at all, the on-screen advice line becomes a live region instead. */
 /* On iPhone and iPad, Safari's browser voice stays silent once the microphone is open, so advice is
    passed to VoiceOver through a hidden live region instead. Everywhere else the browser voice is used. */
-const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const ON_DEMAND_MIC = true;
 const ADVANCED_MIC = false;   /* the microphone test is switched off for now; set true and remove the hidden attribute on #advanced to bring it back */   /* on iPhone the microphone is opened only while the voice test runs */
-const synth = (!IOS && 'speechSynthesis' in window) ? window.speechSynthesis : null;
+const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
 let speechUnlocked = false;
 const liveRegion = document.createElement('div');
 liveRegion.className = 'vh';
@@ -525,12 +533,6 @@ function liveSay(text) {
     }, 80);
   });
 }
-if (!synth && !IOS) {
-  /* with no browser voice the coach line is the only live advice, so it must stay available */
-  const pp = document.getElementById('previewPanel');
-  if (pp) pp.removeAttribute('aria-hidden');
-  els.coach.setAttribute('aria-live', 'polite');
-}
 (() => {
   const mv = document.getElementById('meterValue'), ms = document.getElementById('meterSr');
   if (mv && ms) new MutationObserver(() => { ms.textContent = 'Microphone peak level now: ' + mv.textContent; }).observe(mv, { childList: true, characterData: true, subtree: true });
@@ -548,7 +550,7 @@ function unlockSpeech() {
   } catch (e) { /* ignore */ }
 }
 function speak(text, interrupt) {
-  if (IOS || S.via === 'reader') return liveSay(text);
+  if (S.via === 'reader' || !synth) return liveSay(text);   /* with no browser voice at all, the screen reader route is the only one */
   return new Promise((resolve) => {
     if (!synth) { resolve(); return; }
     let finished = false;
@@ -1613,28 +1615,40 @@ function maybeAnnounce(top, f, issues) {
   if (S.paused || S.testing) return;
   const A = S.announce;
   const now = Date.now();
-  /* When the thing that was last spoken about has been corrected, say so straight away, without the
-     usual wait, so the person knows it worked. */
-  if (A.spokenId && !(issues || []).some((r) => r.id === A.spokenId) && (f.found || A.spokenId === 'face')) {
-    const done = FIXED_WORDS[A.spokenId] || 'Corrected.';
-    say(done, { auto: true });
-    /* Only the fixed item is announced here. Whatever is left to do, or 'looks good', follows through
-       the normal path below once it has been steady for two checks. */
-    A.spoken = null; A.spokenId = null; A.at = now - 2000;
+  const list = A.list || [];
+  const cur = issues || [];
+  const curIds = new Set(cur.map((r) => r.id));
+  /* When something that was spoken about has been corrected, say so straight away, without the usual
+     wait, so the person knows it worked. Only the fixed items are named here. */
+  const cleared = list.filter((x) => !curIds.has(x.id) && (f.found || x.id === 'face'));
+  if (cleared.length) {
+    say(cleared.map((x) => FIXED_WORDS[x.id] || 'Corrected.').join(' '), { auto: true });
+    A.list = list.filter((x) => curIds.has(x.id));
+    A.spoken = null; A.at = now - 2000;
     A.cand = null; A.count = 0;
     return;
   }
+  /* The most important issues, as many as the person chose in Settings. Anything else waits its turn. */
+  const picked = cur.slice(0, S.liveCount || 1);
   let key;
-  if (top) key = top.key;
+  if (picked.length) key = picked.map((r) => r.key).join('|');
   else if (f.found) key = 'ok';
   else return;
   if (key === A.cand) A.count++; else { A.cand = key; A.count = 1; }
   if (A.count < 2) return;
-  const text = top ? top.text : 'Everything looks good. Hold this position.';
   if (key !== A.spoken && now - A.at >= 3000) {
-    say(text, { auto: true }); A.spoken = key; A.spokenId = top ? top.id : null; A.at = now;
+    if (!picked.length) { say('Everything looks good. Hold this position.', { auto: true }); A.list = []; }
+    else {
+      /* Say only what has not been said yet, so fixing one of several issues does not repeat the rest. */
+      const said = new Set(list.map((x) => x.key));
+      const fresh = picked.filter((r) => !said.has(r.key));
+      if (fresh.length) say(fresh.map((r) => r.text).join(' '), { auto: true });
+      A.list = picked.map((r) => ({ id: r.id, key: r.key }));
+    }
+    A.spoken = key; A.at = now;
   } else if (key === A.spoken && key !== 'ok' && now - A.at >= 12000) {
-    say(text, { auto: true }); A.at = now;
+    say(picked.map((r) => r.text).join(' '), { auto: true });
+    A.at = now;
   }
 }
 
@@ -1688,8 +1702,7 @@ function checkNow() {
   /* The result is shown as text and spoken by the browser voice. Focus stays where it is. */
   const out = (text) => {
     els.checkResult.textContent = text;
-    if (!synth && !IOS && S.via !== 'reader') els.checkResult.focus();   /* no browser voice here, so the screen reader reads it instead */
-    else say(text);
+    say(text);
   };
   if (!S.stream) { out('The camera is not running. Press Start first.'); return; }
   if (!S.videoTrack) { out('No camera is running.'); return; }
@@ -1816,21 +1829,19 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   };
   themeSel.addEventListener('change', () => { setTheme(themeSel.value); status.textContent = themeSel.options[themeSel.selectedIndex].text + ' appearance.'; });
   const rateSel = document.getElementById('speechRate'), rateHelp = document.getElementById('speechRateHelp');
+  const countSel = document.getElementById('liveCount');
+  countSel.addEventListener('change', () => { S.liveCount = parseInt(countSel.value, 10) || 1; S.announce = { cand: null, count: 0, spoken: null, spokenId: null, at: 0, list: [] }; status.textContent = 'Live feedback gives ' + countSel.options[countSel.selectedIndex].text.toLowerCase() + '.'; });
   const viaSel = document.getElementById('speakVia');
-  if (IOS) {
-    viaSel.value = 'reader'; viaSel.disabled = true;
-    document.getElementById('speakViaHelp').textContent = 'On an iPhone or iPad the advice is always announced to VoiceOver.';
-  }
+  viaSel.value = S.via;
+  if (IOS) document.getElementById('speakViaHelp').textContent = 'On an iPhone or iPad, My screen reader (VoiceOver) is the default because the browser voice is sometimes silent there. You can try The browser voice if you prefer it.';
   viaSel.addEventListener('change', () => {
     S.via = viaSel.value === 'reader' ? 'reader' : 'browser';
-    rateSel.disabled = IOS || S.via === 'reader';
+    rateSel.disabled = S.via === 'reader';
     unlockSpeech();
     say(S.via === 'reader' ? 'The advice will now be announced to your screen reader.' : 'The advice will now be spoken by the browser voice.');
   });
-  if (IOS) {
-    rateSel.disabled = true;
-    rateHelp.textContent = 'On an iPhone or iPad the advice is read by VoiceOver, so change its speed in the VoiceOver settings.';
-  }
+  rateSel.disabled = S.via === 'reader';
+  rateHelp.textContent = 'Changes the browser voice only. When your screen reader speaks the advice, change its speed in your screen reader settings.';
   rateSel.addEventListener('change', () => {
     S.rate = parseFloat(rateSel.value) || 1;
     unlockSpeech();
@@ -1840,7 +1851,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   /* Saving: the one thing this page ever stores, and only when asked. */
   const KEY = 'checkmycamera.settings';
   document.getElementById('saveBtn').addEventListener('click', () => {
-    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, plainKeys: S.plainKeys, via: S.via, values: {}, off: {} };
+    const data = { preset: presetSel.value, rate: S.rate, theme: themeSel.value, plainKeys: S.plainKeys, via: S.via, liveCount: S.liveCount, values: {}, off: {} };
     for (const d of SETTING_DEFS) data.values[d.key] = getSetting(d.key);
     for (const [id] of FEEDBACK_TYPES) if (OFF[id]) data.off[id] = true;
     try { localStorage.setItem(KEY, JSON.stringify(data)); status.textContent = 'Settings saved on this device.'; }
@@ -1860,11 +1871,12 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
         OFF[id] = off; boxes[id].checked = !off;
         if (rowEls[id]) rowEls[id].li.hidden = off;
       }
-      if (typeof data.rate === 'number' && data.rate > 0 && !IOS) { S.rate = data.rate; if ([...rateSel.options].some((o) => o.value === String(data.rate))) rateSel.value = String(data.rate); }
+      if (typeof data.rate === 'number' && data.rate > 0) { S.rate = data.rate; if ([...rateSel.options].some((o) => o.value === String(data.rate))) rateSel.value = String(data.rate); }
       if (['relaxed', 'balanced', 'picky', 'custom'].includes(data.preset)) presetSel.value = data.preset;
       setTheme(data.theme);
       if (data.plainKeys === false) setPlain(false);
-      if (data.via === 'reader' && !IOS) { S.via = 'reader'; viaSel.value = 'reader'; rateSel.disabled = true; }
+      if ([1, 2, 3].includes(data.liveCount)) { S.liveCount = data.liveCount; countSel.value = String(data.liveCount); }
+      if (data.via === 'reader' || data.via === 'browser') { S.via = data.via; viaSel.value = data.via; rateSel.disabled = data.via === 'reader'; }
       refresh();
     }
   } catch (e) { /* no saved settings, or storage is blocked */ }
