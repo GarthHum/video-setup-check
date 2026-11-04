@@ -400,11 +400,11 @@
       <div class="field" style="max-width:20rem; margin-top:1rem">
         <label for="speechRate">Browser voice speed</label>
         <select id="speechRate">
-          <option value="0.8">Slower</option>
-          <option value="1" selected>Normal</option>
-          <option value="1.25">Faster</option>
-          <option value="1.5">Much faster</option>
-          <option value="1.75">Very fast</option>
+          <option value="0.8">Much slower</option>
+          <option value="1">Slower</option>
+          <option value="1.25" selected>Normal</option>
+          <option value="1.5">Faster</option>
+          <option value="1.75">Much faster</option>
           <option value="2">Fastest</option>
         </select>
         <p class="small" id="speechRateHelp" style="margin:.25rem 0 0">Changes the voice that speaks the advice. It does not change your screen reader.</p>
@@ -516,7 +516,7 @@ const S = {
   mic: { shown: -100, ticks: 0 },
   voice: null, testing: false, testBuf: null, rec: null, clip: null, proc: null, playing: false,
   announce: { cand: null, count: 0, spoken: null, spokenId: null, at: 0 },
-  paused: true, utter: null, rate: 1, plainKeys: true, lightRef: null, motion: { on: false, got: false, e: null, rho: null, at: 0 }, roomOn: false, via: IOS ? 'reader' : 'browser', liveCount: 1,
+  paused: true, utter: null, rate: 1.25, plainKeys: true, lightRef: null, motion: { on: false, got: false, e: null, rho: null, at: 0 }, roomOn: false, via: IOS ? 'reader' : 'browser', liveCount: 1,
 };
 
 /* ---------- Announcements ---------- */
@@ -2001,7 +2001,7 @@ const FEEDBACK_TYPES = [['center', 'Position left and right'], ['height', 'Heigh
   rateSel.disabled = S.via === 'reader';
   rateHelp.textContent = 'Changes the browser voice only. When your screen reader speaks the advice, change its speed in your screen reader settings.';
   rateSel.addEventListener('change', () => {
-    S.rate = parseFloat(rateSel.value) || 1;
+    S.rate = parseFloat(rateSel.value) || 1.25;
     unlockSpeech();
     say('This is the voice at this speed.');
   });
